@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --paper: 40 30% 98%;
+    --background: 40 30% 98%;
+    --foreground: 60 3% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 60 3% 10%;
+
+    --primary: 218 46% 28%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 45 18% 94%;
+    --secondary-foreground: 60 3% 28%;
+
+    --muted: 45 12% 92%;
+    --muted-foreground: 50 4% 52%;
+
+    --accent: 218 46% 95%;
+    --accent-foreground: 218 46% 28%;
+
+    --warm: 27 57% 38%;
+    --warm-foreground: 0 0% 100%;
+
+    --border: 43 18% 90%;
+    --input: 43 18% 88%;
+    --ring: 218 46% 28%;
+
+    --radius: 0.9rem;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  html, body { margin: 0; padding: 0; background: #e9e7e1; }
+  body { @apply text-foreground; -webkit-font-smoothing: antialiased; }
+  textarea { resize: vertical; }
+  button { -webkit-tap-highlight-color: transparent; }
+}
+
+.app-scroll::-webkit-scrollbar { width: 0; background: transparent; }
