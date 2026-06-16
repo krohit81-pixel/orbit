@@ -15,6 +15,7 @@ export interface Stakeholder {
   relationship: Relationship;
   reportsTo: string | null;
   summary?: string;
+  summaryGeneratedAt?: string | null; // ISO timestamp of last synthesis
 }
 
 export interface Expectation {
@@ -75,6 +76,7 @@ export interface ReviewItem { _id: string; include: boolean; [k: string]: unknow
 export interface ReviewPerson extends ReviewItem { name: string; role?: string | null; existing: boolean }
 export interface ReviewModel {
   title: string;
+  date: string; // ISO yyyy-mm-dd, editable before commit
   summary: string;
   topics: string[];
   people: ReviewPerson[];

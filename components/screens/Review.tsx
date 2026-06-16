@@ -5,9 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Eyebrow, SectionTitle, SourceQuote } from "@/components/bits";
+import { Eyebrow, SectionTitle, SourceQuote, DueLabel } from "@/components/bits";
 import { useFlow } from "@/components/flow";
-import { fmtDate } from "@/lib/utils";
 import type { ReviewModel } from "@/lib/types";
 
 export function ReviewScreen() {
@@ -44,8 +43,9 @@ export function ReviewScreen() {
       </p>
 
       <Card className="mb-4 bg-[#FCFBF8]"><CardContent>
-        <Eyebrow>Proposed title &amp; summary</Eyebrow>
+        <Eyebrow>Proposed title, date &amp; summary</Eyebrow>
         <Input className="mt-2 font-semibold" value={r.title} onChange={(e) => setReview({ ...r, title: e.target.value })} />
+        <Input type="date" className="mt-2 w-auto" value={r.date} onChange={(e) => setReview({ ...r, date: e.target.value })} />
         <div className="mt-2.5 font-serif text-[15.5px] leading-relaxed">{r.summary}</div>
       </CardContent></Card>
 
@@ -82,9 +82,9 @@ export function ReviewScreen() {
               <Toggle on={x.include} onClick={() => toggle("commitments", x._id)} />
               <div className="flex-1">
                 <div className="font-semibold">{x.text}</div>
-                <div className="mt-1 flex gap-2">
+                <div className="mt-1 flex items-center gap-2">
                   <Badge variant="accent">{x.owner === "me" ? "You owe" : x.owner}</Badge>
-                  {x.dueDate ? <Badge variant="warm">{fmtDate(x.dueDate)}</Badge> : x.due ? <Badge variant="warm">{x.due}</Badge> : null}
+                  <DueLabel dueDate={x.dueDate} due={x.due} />
                 </div>
                 <SourceQuote>{x.source}</SourceQuote>
               </div>

@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowLeft, CircleDot, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CircleDot, CheckCircle2, Pencil } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Eyebrow, SectionTitle, SourceQuote } from "@/components/bits";
+import { Eyebrow, SectionTitle, SourceQuote, DueLabel } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
 import { fmtDate, stakeholderById } from "@/lib/utils";
@@ -16,7 +16,12 @@ export function MeetingScreen({ id }: { id: string }) {
 
   return (
     <div>
-      <button className="py-2" onClick={() => go({ screen: "meetings" })}><ArrowLeft className="h-5 w-5" /></button>
+      <div className="flex items-center justify-between py-2">
+        <button onClick={() => go({ screen: "meetings" })}><ArrowLeft className="h-5 w-5" /></button>
+        <button onClick={() => go({ screen: "editMeeting", id })} className="flex items-center gap-1 text-[13px] font-semibold text-primary">
+          <Pencil className="h-3.5 w-3.5" /> Edit
+        </button>
+      </div>
       <div className="text-2xl font-bold tracking-tight">{m.title}</div>
       <div className="mb-3.5 mt-0.5 text-[13px] text-muted-foreground/70">{fmtDate(m.date)}</div>
 
@@ -59,9 +64,9 @@ export function MeetingScreen({ id }: { id: string }) {
               </button>
               <div className="flex-1">
                 <div className={cm.status === "done" ? "font-semibold text-muted-foreground/60 line-through" : "font-semibold"}>{cm.text}</div>
-                <div className="mt-1 flex gap-2">
+                <div className="mt-1 flex items-center gap-2">
                   <Badge variant="accent">{cm.owedByMe ? "You owe" : stakeholderById(stakeholders, cm.stakeholderId)?.name}</Badge>
-                  {cm.dueDate ? <Badge variant="warm">{fmtDate(cm.dueDate)}</Badge> : cm.due ? <Badge variant="warm">{cm.due}</Badge> : null}
+                  <DueLabel dueDate={cm.dueDate} due={cm.due} />
                 </div>
                 <SourceQuote>{cm.source}</SourceQuote>
               </div>

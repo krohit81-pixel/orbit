@@ -24,6 +24,11 @@ export const fmtDate = (s?: string | null): string | null =>
   s ? new Date(s + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : null;
 export const fmtFull = (s?: string | null): string =>
   s ? new Date(s + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "";
+export const fmtStamp = (iso?: string | null): string =>
+  iso ? new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "";
+export const fmtToday = (): string =>
+  new Date().toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
+export const isOverdue = (s?: string | null): boolean => bucketDue(s) === "overdue";
 
 export type DueBucket = "overdue" | "week" | "upcoming" | "undated";
 export function bucketDue(s?: string | null): DueBucket {

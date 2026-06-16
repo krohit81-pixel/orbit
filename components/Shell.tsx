@@ -1,7 +1,7 @@
 "use client";
 
 import { Home, Users, FileText, Search } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, fmtToday } from "@/lib/utils";
 import { useFlow, type View } from "./flow";
 
 const TABS: { key: View["screen"]; label: string; icon: typeof Home }[] = [
@@ -14,16 +14,20 @@ const TABS: { key: View["screen"]; label: string; icon: typeof Home }[] = [
 export function Shell({ children }: { children: React.ReactNode }) {
   const { view, go } = useFlow();
   const active: View["screen"] =
-    view.screen === "stakeholder" || view.screen === "addStakeholder"
+    view.screen === "stakeholder" || view.screen === "editStakeholder" || view.screen === "addStakeholder"
       ? "people"
-      : view.screen === "meeting" || view.screen === "capture" || view.screen === "review"
+      : view.screen === "meeting" || view.screen === "editMeeting" || view.screen === "capture" || view.screen === "review"
       ? "meetings"
       : view.screen;
 
   return (
     <div className="flex min-h-screen justify-center">
       <div className="relative flex min-h-screen w-full max-w-[430px] flex-col bg-paper text-foreground">
-        <div className="app-scroll flex-1 overflow-y-auto px-[18px] pb-24 pt-5">
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-paper/90 px-[18px] py-2.5 backdrop-blur">
+          <button onClick={() => go({ screen: "home" })} className="text-[15px] font-bold tracking-tight">Orbit</button>
+          <span className="text-[11px] font-medium text-muted-foreground/70">{fmtToday()}</span>
+        </header>
+        <div className="app-scroll flex-1 overflow-y-auto px-[18px] pb-24 pt-4">
           {children}
           <div className="mt-10 text-center text-[11px] tracking-wide text-muted-foreground/60">
             Orbit · Rohit

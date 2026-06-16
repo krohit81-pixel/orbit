@@ -11,8 +11,12 @@ create table if not exists stakeholders (
   relationship text default 'Other',
   reports_to   text,
   summary      text,
+  summary_generated_at timestamptz,
   created_at   timestamptz default now()
 );
+
+-- If you created the table on V1 (without summary_generated_at), run this once:
+-- alter table stakeholders add column if not exists summary_generated_at timestamptz;
 
 create table if not exists meetings (
   id           text primary key,

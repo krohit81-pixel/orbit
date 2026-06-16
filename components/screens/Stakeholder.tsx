@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, RefreshCw, Circle } from "lucide-react";
+import { ArrowLeft, RefreshCw, Circle, Pencil } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Eyebrow, SectionTitle, SourceQuote } from "@/components/bits";
+import { Eyebrow, SectionTitle, SourceQuote, DueLabel } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
-import { intel, trajectory, fmtFull, stakeholderById } from "@/lib/utils";
+import { intel, trajectory, fmtFull, fmtStamp, stakeholderById } from "@/lib/utils";
 
 export function StakeholderScreen({ id }: { id: string }) {
   const { stakeholders, meetings, setSummary } = useOrbit();
@@ -51,7 +51,12 @@ export function StakeholderScreen({ id }: { id: string }) {
 
   return (
     <div>
-      <button className="py-2" onClick={() => go({ screen: "people" })}><ArrowLeft className="h-5 w-5" /></button>
+      <div className="flex items-center justify-between py-2">
+        <button onClick={() => go({ screen: "people" })}><ArrowLeft className="h-5 w-5" /></button>
+        <button onClick={() => go({ screen: "editStakeholder", id })} className="flex items-center gap-1 text-[13px] font-semibold text-primary">
+          <Pencil className="h-3.5 w-3.5" /> Edit
+        </button>
+      </div>
       <div className="text-2xl font-bold tracking-tight">{s.name}</div>
       <div className="mt-0.5 text-sm text-muted-foreground">{s.title}</div>
       <div className="mt-2 flex items-center gap-2">
@@ -69,6 +74,9 @@ export function StakeholderScreen({ id }: { id: string }) {
           </button>
         </div>
         <div className="mt-2 font-serif text-[16.5px] leading-relaxed">{s.summary}</div>
+        <div className="mt-2.5 text-[11px] text-muted-foreground/60">
+          {s.summaryGeneratedAt ? `Synthesized ${fmtStamp(s.summaryGeneratedAt)} · ${it.interactions.length} interaction(s)` : `Based on ${it.interactions.length} interaction(s)`}
+        </div>
       </CardContent></Card>
 
       {it.cares.length > 0 && (
@@ -132,7 +140,7 @@ export function StakeholderScreen({ id }: { id: string }) {
           {it.comms.map((cm) => (
             <Card key={cm.id} className="mb-2.5"><CardContent className="flex items-center justify-between">
               <div className="font-semibold">{cm.text}</div>
-              {cm.dueDate ? <Badge variant="accent">{fmtFull(cm.dueDate)}</Badge> : cm.due ? <Badge variant="warm">{cm.due}</Badge> : null}
+              <DueLabel dueDate={cm.dueDate} due={cm.due} />
             </CardContent></Card>
           ))}
         </div>

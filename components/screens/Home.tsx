@@ -2,28 +2,29 @@
 
 import { Search, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Eyebrow, SectionTitle } from "@/components/bits";
+import { Eyebrow, SectionTitle, DueLabel } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
-import { bucketDue, fmtDate, intel, myOpenCommitments, stakeholderById, type DueBucket, type OpenCommitment } from "@/lib/utils";
+import { fmtDate, intel, myOpenCommitments, stakeholderById } from "@/lib/utils";
 
 export function HomeScreen() {
   const { self, stakeholders, meetings } = useOrbit();
   const { go } = useFlow();
   const open = myOpenCommitments(meetings);
 
-  const groups: Record<DueBucket, OpenCommitment[]> = { overdue: [], week: [], upcoming: [], undated: [] };
-  open.forEach((cm) => groups[bucketDue(cm.dueDate)].push(cm));
-  (Object.keys(groups) as DueBucket[]).forEach((k) =>
-    groups[k].sort((a, b) => (a.dueDate || "9999").localeCompare(b.dueDate || "9999"))
-  );
-  const order: { key: DueBucket; label: string }[] = [
-    { key: "overdue", label: "Overdue" },
-    { key: "week", label: "This week" },
-    { key: "upcoming", label: "Upcoming" },
-    { key: "undated", label: "No date yet" },
-  ];
+  // person-first grouping: commitments by the stakeholder they relate to
+  const groups = new Map<string, typeof open>();
+  open.forEach((cm) => {
+    const key = cm.stakeholderId ?? "__unassigned";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(cm);
+  });
+  const groupList = [...groups.entries()].sort((a, b) => {
+    if (a[0] === "__unassigned") return 1;
+    if (b[0] === "__unassigned") return -1;
+    return (stakeholderById(stakeholders, a[0])?.name ?? "").localeCompare(stakeholderById(stakeholders, b[0])?.name ?? "");
+  });
+  groupList.forEach(([, items]) => items.sort((x, y) => (x.dueDate || "9999").localeCompare(y.dueDate || "9999")));
 
   const recent = stakeholders
     .filter((s) => meetings.slice(0, 2).some((m) => m.mentioned.includes(s.id)))
@@ -56,34 +57,32 @@ export function HomeScreen() {
         </Card>
       ))}
 
-      <SectionTitle>Your open commitments</SectionTitle>
+      <SectionTitle>Open commitments by stakeholder</SectionTitle>
       {open.length === 0 && (
         <Card className="mb-2.5"><CardContent className="text-muted-foreground/70">Nothing outstanding. Clean slate.</CardContent></Card>
       )}
-      {order.map(({ key, label }) =>
-        groups[key].length === 0 ? null : (
-          <div key={key}>
-            <div className={`mb-1.5 mt-2 text-[11px] font-bold tracking-wide ${key === "overdue" ? "text-warm" : "text-muted-foreground/60"}`}>{label}</div>
-            {groups[key].map((cm) => (
+      {groupList.map(([key, items]) => {
+        const person = key === "__unassigned" ? null : stakeholderById(stakeholders, key);
+        return (
+          <div key={key} className="mb-1.5">
+            <button
+              className="mb-1.5 mt-2 flex items-center gap-1.5"
+              onClick={() => person && go({ screen: "stakeholder", id: person.id })}
+            >
+              <span className="text-[12px] font-bold tracking-wide text-foreground">{person ? person.name : "Unassigned"}</span>
+              <span className="text-[11px] text-muted-foreground/60">· {items.length}</span>
+            </button>
+            {items.map((cm) => (
               <Card key={cm.id} className="mb-2.5">
-                <CardContent className="flex justify-between gap-2.5">
-                  <div>
-                    <div className="font-semibold">{cm.text}</div>
-                    <div className="mt-0.5 text-[12.5px] text-muted-foreground">
-                      {cm.stakeholderId ? stakeholderById(stakeholders, cm.stakeholderId)?.name : "—"}
-                    </div>
-                  </div>
-                  {cm.dueDate ? (
-                    <Badge variant={key === "overdue" ? "warm" : "accent"}>{fmtDate(cm.dueDate)}</Badge>
-                  ) : cm.due ? (
-                    <Badge variant="warm">{cm.due}</Badge>
-                  ) : null}
+                <CardContent>
+                  <div className="font-semibold">{cm.text}</div>
+                  <DueLabel dueDate={cm.dueDate} due={cm.due} className="mt-1 block" />
                 </CardContent>
               </Card>
             ))}
           </div>
-        )
-      )}
+        );
+      })}
 
       {recent.length > 0 && (
         <>

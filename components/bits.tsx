@@ -1,5 +1,17 @@
 import { Quote } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { bucketDue, fmtDate } from "@/lib/utils";
+
+export function DueLabel({ dueDate, due, className }: { dueDate?: string | null; due?: string | null; className?: string }) {
+  if (!dueDate && !due) return null;
+  const overdue = dueDate ? bucketDue(dueDate) === "overdue" : false;
+  const text = dueDate ? (overdue ? `Overdue · ${fmtDate(dueDate)}` : fmtDate(dueDate)) : due;
+  return (
+    <span className={cn("text-[12px] font-medium", overdue ? "text-warm" : "text-muted-foreground/70", className)}>
+      {text}
+    </span>
+  );
+}
 
 export function Eyebrow({ children, className }: { children: React.ReactNode; className?: string }) {
   return (

@@ -50,10 +50,10 @@ export async function POST(req: Request) {
     if (task === "extract") {
       const transcript = String(body.transcript || "");
       const known = String(body.known || "");
-      const today = String(body.today || new Date().toISOString().slice(0, 10));
-      const weekday = new Date().toLocaleDateString("en-GB", { weekday: "long" });
+      const meetingDate = String(body.meetingDate || body.today || new Date().toISOString().slice(0, 10));
+      const weekday = new Date(meetingDate + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long" });
       const system = `You are the extraction engine for Orbit, an executive intelligence app. The user (the leader) is named Rohit.
-Today is ${today} (${weekday}). When a due date is stated or implied ("next week", "by the 30th", "end of month"), resolve it to a concrete calendar date.
+This meeting took place on ${meetingDate} (${weekday}). Resolve any relative due dates ("next week", "by the 30th", "end of month") RELATIVE TO THE MEETING DATE, not to today.
 From the meeting transcript, extract structured intelligence. Known stakeholders: ${known || "(none yet)"}.
 Attribute each item to a stakeholder by full name when clear, otherwise null. A commitment's "owner" is "me" when Rohit owes it, otherwise the stakeholder's name.
 For every expectation, commitment and concern, include a short verbatim "source" quote (under 12 words) taken from the transcript.

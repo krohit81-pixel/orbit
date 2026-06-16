@@ -7,7 +7,7 @@ const USER = "rohit"; // single-user V1; becomes auth.uid() when auth is added
 // ---- row <-> domain mapping ----
 type StakeholderRow = {
   id: string; name: string; title: string | null; relationship: string | null;
-  reports_to: string | null; summary: string | null;
+  reports_to: string | null; summary: string | null; summary_generated_at: string | null;
 };
 type MeetingRow = {
   id: string; title: string; date: string; summary: string | null;
@@ -25,6 +25,7 @@ function toStakeholder(r: StakeholderRow): Stakeholder {
     relationship: (r.relationship as Stakeholder["relationship"]) ?? "Other",
     reportsTo: r.reports_to,
     summary: r.summary ?? undefined,
+    summaryGeneratedAt: r.summary_generated_at,
   };
 }
 function toMeeting(r: MeetingRow): Meeting {
@@ -43,7 +44,7 @@ function toMeeting(r: MeetingRow): Meeting {
   };
 }
 function stakeholderRow(s: Stakeholder) {
-  return { id: s.id, user_id: USER, name: s.name, title: s.title, relationship: s.relationship, reports_to: s.reportsTo, summary: s.summary ?? null };
+  return { id: s.id, user_id: USER, name: s.name, title: s.title, relationship: s.relationship, reports_to: s.reportsTo, summary: s.summary ?? null, summary_generated_at: s.summaryGeneratedAt ?? null };
 }
 function meetingRow(m: Meeting) {
   return {
@@ -86,6 +87,27 @@ export async function insertMeeting(m: Meeting) {
 export async function updateMeeting(id: string, patch: Partial<ReturnType<typeof meetingRow>>) {
   await supabase.from("meetings").update(patch).eq("id", id);
 }
-export async function updateStakeholder(id: string, patch: { summary?: string }) {
-  await supabase.from("stakeholders").update(patch).eq("id", id);
+export async function saveMeeting(m: Meeting) {
+  const { id, ...rest } = meetingRow(m);
+  await supabase.from("meetings").update(rest).eq("id", id);
+}
+export async function deleteMeeting(id: string) {
+  await supabase.from("meetings").delete().eq("id", id);
+}
+
+export async function updateStakeholder(
+  id: string,
+  patch: { name?: string; title?: string; relationship?: string; reportsTo?: string | null; summary?: string; summaryGeneratedAt?: string | null }
+) {
+  const row: Record<string, unknown> = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.relationship !== undefined) row.relationship = patch.relationship;
+  if (patch.reportsTo !== undefined) row.reports_to = patch.reportsTo;
+  if (patch.summary !== undefined) row.summary = patch.summary;
+  if (patch.summaryGeneratedAt !== undefined) row.summary_generated_at = patch.summaryGeneratedAt;
+  await supabase.from("stakeholders").update(row).eq("id", id);
+}
+export async function deleteStakeholder(id: string) {
+  await supabase.from("stakeholders").delete().eq("id", id);
 }

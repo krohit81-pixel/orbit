@@ -15,7 +15,11 @@ interface OrbitContextValue {
   meetings: Meeting[];
   refresh: () => Promise<void>;
   addStakeholder: (s: Omit<Stakeholder, "id" | "summary">) => Promise<string>;
+  saveStakeholder: (s: Stakeholder) => Promise<void>;
+  deleteStakeholder: (id: string) => Promise<void>;
   commitMeeting: (review: ReviewModel) => Promise<void>;
+  saveMeeting: (m: Meeting) => Promise<void>;
+  deleteMeeting: (id: string) => Promise<void>;
   toggleCommitment: (meetingId: string, commId: string) => Promise<void>;
   setSummary: (sid: string, summary: string) => Promise<void>;
 }
@@ -69,7 +73,7 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
     const meeting: Meeting = {
       id: uid(),
       title: review.title,
-      date: new Date().toISOString().slice(0, 10),
+      date: review.date || new Date().toISOString().slice(0, 10),
       summary: review.summary,
       topics: review.topics,
       mentioned: review.people.filter((p) => p.include).map((p) => resolve(p.name)).filter((x): x is string => !!x),
@@ -86,6 +90,50 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
     await db.insertMeeting(meeting);
   }, [stakeholders]);
 
+  const saveStakeholder = useCallback(async (s: Stakeholder) => {
+    setStakeholders((prev) => prev.map((x) => (x.id === s.id ? s : x)));
+    await db.updateStakeholder(s.id, {
+      name: s.name, title: s.title, relationship: s.relationship, reportsTo: s.reportsTo, summary: s.summary,
+    });
+  }, []);
+
+  // detach-and-keep: remove the stakeholder, but leave their meetings intact with references cleared
+  const deleteStakeholder = useCallback(async (id: string) => {
+    const touched: Meeting[] = [];
+    setMeetings((prev) =>
+      prev.map((m) => {
+        const refs =
+          m.mentioned.includes(id) ||
+          m.expectations.some((e) => e.stakeholderId === id) ||
+          m.commitments.some((e) => e.stakeholderId === id) ||
+          m.concerns.some((e) => e.stakeholderId === id);
+        if (!refs) return m;
+        const next: Meeting = {
+          ...m,
+          mentioned: m.mentioned.filter((x) => x !== id),
+          expectations: m.expectations.map((e) => (e.stakeholderId === id ? { ...e, stakeholderId: null } : e)),
+          commitments: m.commitments.map((e) => (e.stakeholderId === id ? { ...e, stakeholderId: null } : e)),
+          concerns: m.concerns.map((e) => (e.stakeholderId === id ? { ...e, stakeholderId: null } : e)),
+        };
+        touched.push(next);
+        return next;
+      })
+    );
+    setStakeholders((prev) => prev.filter((s) => s.id !== id));
+    await Promise.all(touched.map((m) => db.saveMeeting(m)));
+    await db.deleteStakeholder(id);
+  }, []);
+
+  const saveMeeting = useCallback(async (m: Meeting) => {
+    setMeetings((prev) => prev.map((x) => (x.id === m.id ? m : x)).sort((a, b) => (b.date || "").localeCompare(a.date || "")));
+    await db.saveMeeting(m);
+  }, []);
+
+  const deleteMeeting = useCallback(async (id: string) => {
+    setMeetings((prev) => prev.filter((m) => m.id !== id));
+    await db.deleteMeeting(id);
+  }, []);
+
   const toggleCommitment = useCallback(async (meetingId: string, commId: string) => {
     let nextCommitments: Meeting["commitments"] | null = null;
     setMeetings((prev) => prev.map((m) => {
@@ -98,13 +146,15 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setSummary = useCallback(async (sid: string, summary: string) => {
-    setStakeholders((prev) => prev.map((s) => (s.id === sid ? { ...s, summary } : s)));
-    await db.updateStakeholder(sid, { summary });
+    const stamp = new Date().toISOString();
+    setStakeholders((prev) => prev.map((s) => (s.id === sid ? { ...s, summary, summaryGeneratedAt: stamp } : s)));
+    await db.updateStakeholder(sid, { summary, summaryGeneratedAt: stamp });
   }, []);
 
   const value: OrbitContextValue = {
     ready, configured: supabaseConfigured, error, self: { name: "Rohit" },
-    stakeholders, meetings, refresh, addStakeholder, commitMeeting, toggleCommitment, setSummary,
+    stakeholders, meetings, refresh, addStakeholder, saveStakeholder, deleteStakeholder,
+    commitMeeting, saveMeeting, deleteMeeting, toggleCommitment, setSummary,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

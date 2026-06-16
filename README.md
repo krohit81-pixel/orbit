@@ -4,9 +4,29 @@ Your AI chief of staff. Orbit turns meeting transcripts into living stakeholder
 intelligence — what each person cares about, what they expect from you, what
 you've committed to, and **how the relationship has evolved over time**.
 
-Single-user V1. Next.js (App Router) + TypeScript + Tailwind + shadcn-style UI,
+Single-user V1.1. Next.js (App Router) + TypeScript + Tailwind + shadcn-style UI,
 with **Supabase** as the data layer and server-side LLM extraction. Deployable to
 Vercel.
+
+## New in V1.1
+
+- **Edit & delete** for stakeholders and meetings. Deleting a stakeholder uses
+  **detach-and-keep**: their meetings stay, references to them are cleared (never
+  silently guts a meeting). Deletes ask for confirmation.
+- **Editable meeting dates** (set when adding, change anytime). Trajectory and all
+  intelligence re-order to the real date automatically; the extractor resolves
+  relative due-dates against the meeting date, not today.
+- **Editable due dates** on commitments.
+- **Home is person-first**: open commitments grouped by stakeholder.
+- **Cleaner dates**: due dates render as quiet aligned text; color is reserved for
+  overdue only.
+- **Today's date** in the top bar, and a **"Synthesized {date}"** stamp on each
+  stakeholder's AI summary.
+
+> **Upgrading a V1 database?** Run this once in the Supabase SQL editor:
+> `alter table stakeholders add column if not exists summary_generated_at timestamptz;`
+> (Fresh installs get it from `schema.sql` automatically.)
+
 
 ---
 

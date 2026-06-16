@@ -8,8 +8,10 @@ import { HomeScreen } from "./screens/Home";
 import { PeopleScreen } from "./screens/People";
 import { StakeholderScreen } from "./screens/Stakeholder";
 import { AddStakeholderScreen } from "./screens/AddStakeholder";
+import { EditStakeholderScreen } from "./screens/EditStakeholder";
 import { MeetingsScreen } from "./screens/Meetings";
 import { MeetingScreen } from "./screens/MeetingDetail";
+import { EditMeetingScreen } from "./screens/EditMeeting";
 import { CaptureScreen } from "./screens/Capture";
 import { ReviewScreen } from "./screens/Review";
 import { SearchScreen } from "./screens/Search";
@@ -17,7 +19,7 @@ import { SAMPLE_TRANSCRIPT } from "@/lib/seed";
 import { todayISO, uid } from "@/lib/utils";
 import type { Extraction, ReviewModel, ReviewPerson } from "@/lib/types";
 
-function buildReview(ex: Extraction, knownNames: Set<string>): ReviewModel {
+function buildReview(ex: Extraction, knownNames: Set<string>, date: string): ReviewModel {
   const names = new Set<string>();
   ex.stakeholders?.forEach((p) => p.name && names.add(p.name));
   ex.expectations?.forEach((x) => x.stakeholder && names.add(x.stakeholder));
@@ -35,6 +37,7 @@ function buildReview(ex: Extraction, knownNames: Set<string>): ReviewModel {
   }));
   return {
     title: ex.title || "Untitled meeting",
+    date,
     summary: ex.summary || "",
     topics: ex.topics || [],
     people,
@@ -68,6 +71,7 @@ function Inner() {
   const store = useOrbit();
   const [view, setView] = useState<View>({ screen: "home" });
   const [draft, setDraft] = useState(SAMPLE_TRANSCRIPT);
+  const [meetingDate, setMeetingDate] = useState(todayISO());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [review, setReview] = useState<ReviewModel | null>(null);
@@ -81,11 +85,11 @@ function Inner() {
       const res = await fetch("/api/llm", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ task: "extract", transcript: draft, known: store.stakeholders.map((s) => s.name).join(", "), today: todayISO() }),
+        body: JSON.stringify({ task: "extract", transcript: draft, known: store.stakeholders.map((s) => s.name).join(", "), today: todayISO(), meetingDate }),
       });
       const data = await res.json();
       if (!res.ok || !data.extraction) throw new Error(data.error || "Extraction failed.");
-      setReview(buildReview(data.extraction, knownNames()));
+      setReview(buildReview(data.extraction, knownNames(), meetingDate));
       setView({ screen: "review" });
     } catch (e) {
       setErr((e instanceof Error ? e.message : "Extraction failed.") + " You can load the sample result to continue.");
@@ -95,7 +99,7 @@ function Inner() {
   };
 
   const loadSample = () => {
-    setReview(buildReview(SAMPLE_EXTRACTION, knownNames()));
+    setReview(buildReview(SAMPLE_EXTRACTION, knownNames(), meetingDate));
     setView({ screen: "review" });
   };
 
@@ -104,19 +108,22 @@ function Inner() {
     await store.commitMeeting(review);
     setReview(null);
     setDraft(SAMPLE_TRANSCRIPT);
+    setMeetingDate(todayISO());
     setView({ screen: "meetings" });
   };
 
-  const flow: Flow = { view, go: setView, draft, setDraft, busy, err, review, setReview, runExtraction, loadSample, commit };
+  const flow: Flow = { view, go: setView, draft, setDraft, meetingDate, setMeetingDate, busy, err, review, setReview, runExtraction, loadSample, commit };
 
   let body: React.ReactNode;
   switch (view.screen) {
     case "home": body = <HomeScreen />; break;
     case "people": body = <PeopleScreen />; break;
     case "stakeholder": body = <StakeholderScreen id={view.id} />; break;
+    case "editStakeholder": body = <EditStakeholderScreen id={view.id} />; break;
     case "addStakeholder": body = <AddStakeholderScreen />; break;
     case "meetings": body = <MeetingsScreen />; break;
     case "meeting": body = <MeetingScreen id={view.id} />; break;
+    case "editMeeting": body = <EditMeetingScreen id={view.id} />; break;
     case "capture": body = <CaptureScreen />; break;
     case "review": body = <ReviewScreen />; break;
     case "search": body = <SearchScreen />; break;

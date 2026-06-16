@@ -11,13 +11,17 @@ export type View =
   | { screen: "capture" }
   | { screen: "review" }
   | { screen: "stakeholder"; id: string }
-  | { screen: "meeting"; id: string };
+  | { screen: "editStakeholder"; id: string }
+  | { screen: "meeting"; id: string }
+  | { screen: "editMeeting"; id: string };
 
 export interface Flow {
   view: View;
   go: (v: View) => void;
   draft: string;
   setDraft: (s: string) => void;
+  meetingDate: string;
+  setMeetingDate: (s: string) => void;
   busy: boolean;
   err: string;
   review: ReviewModel | null;

@@ -3,10 +3,12 @@
 import { ArrowLeft, Sparkles, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useFlow } from "@/components/flow";
 
 export function CaptureScreen() {
-  const { go, draft, setDraft, busy, err, runExtraction, loadSample } = useFlow();
+  const { go, draft, setDraft, meetingDate, setMeetingDate, busy, err, runExtraction, loadSample } = useFlow();
   return (
     <div>
       <div className="flex items-center gap-3 py-2 pb-3">
@@ -16,7 +18,12 @@ export function CaptureScreen() {
       <p className="mb-3 text-[13.5px] leading-relaxed text-muted-foreground">
         Paste a transcript or notes (Otter export, TXT, or a quick recap). Orbit extracts the intelligence — then you review it before anything is saved.
       </p>
-      <Textarea rows={12} value={draft} onChange={(e) => setDraft(e.target.value)} />
+      <div className="mb-3">
+        <Label>Meeting date</Label>
+        <Input type="date" className="mt-1.5 w-auto" value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)} />
+        <p className="mt-1 text-[11.5px] text-muted-foreground/70">Set this to when the meeting happened — due dates and the trajectory use it.</p>
+      </div>
+      <Textarea rows={11} value={draft} onChange={(e) => setDraft(e.target.value)} />
       {err && (
         <div className="mt-2.5 flex items-start gap-2 text-[13px] text-warm">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
