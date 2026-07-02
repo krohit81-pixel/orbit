@@ -4,39 +4,44 @@
 
 @layer base {
   :root {
-    --paper: 40 30% 98%;
-    --background: 40 30% 98%;
-    --foreground: 60 3% 10%;
+    /* Microsoft Teams / Fluent palette */
+    --paper: 0 0% 98%;
+    --background: 0 0% 98%;
+    --foreground: 240 6% 14%;
 
     --card: 0 0% 100%;
-    --card-foreground: 60 3% 10%;
+    --card-foreground: 240 6% 14%;
 
-    --primary: 218 46% 28%;
+    --primary: 235 49% 57%;          /* Teams violet #5B5FC7 */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 45 18% 94%;
-    --secondary-foreground: 60 3% 28%;
+    --secondary: 240 20% 96%;
+    --secondary-foreground: 240 6% 30%;
 
-    --muted: 45 12% 92%;
-    --muted-foreground: 50 4% 52%;
+    --muted: 240 14% 95%;
+    --muted-foreground: 240 4% 46%;
 
-    --accent: 218 46% 95%;
-    --accent-foreground: 218 46% 28%;
+    --accent: 236 60% 95%;           /* light lavender tint */
+    --accent-foreground: 236 42% 45%;
 
-    --warm: 27 57% 38%;
+    --warm: 348 62% 47%;             /* Teams red for overdue/destructive */
     --warm-foreground: 0 0% 100%;
 
-    --border: 43 18% 90%;
-    --input: 43 18% 88%;
-    --ring: 218 46% 28%;
+    --border: 240 12% 90%;
+    --input: 240 12% 86%;
+    --ring: 235 49% 57%;
 
-    --radius: 0.9rem;
+    --radius: 0.5rem;
   }
 }
 
 @layer base {
   * { @apply border-border; }
-  html, body { margin: 0; padding: 0; background: #e9e7e1; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #f0f0f2;
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", sans-serif;
+  }
   body { @apply text-foreground; -webkit-font-smoothing: antialiased; }
   textarea { resize: vertical; }
   button { -webkit-tap-highlight-color: transparent; }

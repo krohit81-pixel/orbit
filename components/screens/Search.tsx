@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { SectionTitle } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
-import { matchesQuery, fmtDate } from "@/lib/utils";
+import { matchesQuery, fmtFull } from "@/lib/utils";
 
 export function SearchScreen() {
   const { stakeholders, meetings } = useOrbit();
@@ -59,7 +59,7 @@ export function SearchScreen() {
         <div className="mb-[18px]"><SectionTitle>Meetings</SectionTitle>
           {mtgs.map((m) => (
             <Card key={m.id} onClick={() => go({ screen: "meeting", id: m.id })} className="mb-2 cursor-pointer"><CardContent>
-              <div className="font-semibold">{m.title}</div><div className="text-[12.5px] text-muted-foreground">{fmtDate(m.date)}</div>
+              <div className="font-semibold">{m.title}</div><div className="text-[12.5px] text-muted-foreground">{fmtFull(m.date)}</div>
             </CardContent></Card>
           ))}
         </div>

@@ -4,9 +4,28 @@ Your AI chief of staff. Orbit turns meeting transcripts into living stakeholder
 intelligence — what each person cares about, what they expect from you, what
 you've committed to, and **how the relationship has evolved over time**.
 
-Single-user V1.1. Next.js (App Router) + TypeScript + Tailwind + shadcn-style UI,
+Single-user V1.2. Next.js (App Router) + TypeScript + Tailwind + shadcn-style UI,
 with **Supabase** as the data layer and server-side LLM extraction. Deployable to
 Vercel.
+
+## New in V1.2
+
+- **Commitment direction.** Commitments now flow *owner → owed-to*: "You owe Jo",
+  "Tim owes you", "David owes Priya". Editable in review and the meeting editor;
+  the extractor captures direction. **Home** shows both directions grouped by the
+  other party. Stakeholder pages split "what they owe you" vs "what you owe them".
+- **Collapsible Home groups** by stakeholder, with counts; anyone with something
+  overdue or due this week auto-expands.
+- **Unified dates** — every date shows on its own line with the year
+  ("10 Jun 2026"), including Recent Meetings.
+- **Expectation provenance** — each expectation links to the meeting and date it
+  was raised in.
+- **Microsoft Teams look** — Fluent violet palette, Segoe UI, tighter corners,
+  flatter surfaces.
+
+> **No database migration needed for V1.2.** Existing commitments are migrated to
+> the new direction model automatically when read; they persist in the new shape
+> the next time that meeting is edited. Just push and redeploy.
 
 ## New in V1.1
 

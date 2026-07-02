@@ -41,6 +41,18 @@ export function EditMeetingScreen({ id }: { id: string }) {
     </select>
   );
 
+  const PartySelect = ({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) => (
+    <select
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value || null)}
+      className="h-9 rounded-md border border-input bg-card px-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <option value="me">You</option>
+      <option value="">—</option>
+      {stakeholders.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+    </select>
+  );
+
   const RemoveBtn = ({ onClick }: { onClick: () => void }) => (
     <button onClick={onClick} className="text-muted-foreground/60 hover:text-warm" aria-label="Remove"><X className="h-4 w-4" /></button>
   );
@@ -94,9 +106,10 @@ export function EditMeetingScreen({ id }: { id: string }) {
                 <Input value={cm.text} onChange={(ev) => editCom(i, { text: ev.target.value })} className="h-9 flex-1 text-[13px]" />
                 <RemoveBtn onClick={() => setField("commitments", m.commitments.filter((_, idx) => idx !== i))} />
               </div>
-              <div className="mt-2 flex items-center gap-2">
-                <Badge variant="accent">{cm.owedByMe ? "You owe" : "They owe"}</Badge>
-                <StakeholderSelect value={cm.stakeholderId} onChange={(v) => editCom(i, { stakeholderId: v })} />
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px]">
+                <PartySelect value={cm.ownerId} onChange={(v) => editCom(i, { ownerId: v })} />
+                <span className="text-muted-foreground">owes</span>
+                <PartySelect value={cm.owedToId} onChange={(v) => editCom(i, { owedToId: v })} />
               </div>
               <div className="mt-2 flex items-center gap-2">
                 <Label>Due</Label>

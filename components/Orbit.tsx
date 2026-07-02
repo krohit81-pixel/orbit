@@ -26,7 +26,7 @@ function buildReview(ex: Extraction, knownNames: Set<string>, date: string): Rev
   ex.concerns?.forEach((x) => x.stakeholder && names.add(x.stakeholder));
   ex.commitments?.forEach((x) => {
     if (x.owner && x.owner !== "me") names.add(x.owner);
-    if (x.stakeholder) names.add(x.stakeholder);
+    if (x.owedTo && x.owedTo !== "me") names.add(x.owedTo);
   });
   const people: ReviewPerson[] = [...names].filter(Boolean).map((n) => ({
     _id: uid(),
@@ -42,7 +42,7 @@ function buildReview(ex: Extraction, knownNames: Set<string>, date: string): Rev
     topics: ex.topics || [],
     people,
     expectations: (ex.expectations || []).map((x) => ({ ...x, _id: uid(), include: true })),
-    commitments: (ex.commitments || []).map((x) => ({ ...x, _id: uid(), include: true })),
+    commitments: (ex.commitments || []).map((x) => ({ ...x, owedTo: x.owedTo ?? null, _id: uid(), include: true })),
     concerns: (ex.concerns || []).map((x) => ({ ...x, _id: uid(), include: true })),
     decisions: ex.decisions || [],
     actionItems: ex.actionItems || [],
@@ -56,8 +56,9 @@ const SAMPLE_EXTRACTION: Extraction = {
   stakeholders: [{ name: "Maya Chen", role: "Group CRO" }, { name: "David Okafor", role: "Head of Platform" }, { name: "Priya Nair", role: "Head of Talent" }, { name: "Kenji", role: null }],
   expectations: [{ text: "AI governance proposal finalised before quarter-end", stakeholder: "Maya Chen", source: "I need the governance proposal finalised" }],
   commitments: [
-    { text: "Deliver AI governance proposal", owner: "me", stakeholder: "Maya Chen", due: "By the 30th", dueDate: todayISO(), source: "by the 30th" },
-    { text: "Share updated hiring roadmap", owner: "me", stakeholder: "David Okafor", due: "Next week", dueDate: todayISO(), source: "I'll share the hiring roadmap" },
+    { text: "Deliver AI governance proposal", owner: "me", owedTo: "Maya Chen", due: "By the 30th", dueDate: todayISO(), source: "by the 30th" },
+    { text: "Share updated hiring roadmap", owner: "me", owedTo: "David Okafor", due: "Next week", dueDate: todayISO(), source: "I'll share the hiring roadmap" },
+    { text: "Send the board scrutiny brief", owner: "Maya Chen", owedTo: "me", due: null, dueDate: null, source: "I'll get you the brief" },
   ],
   concerns: [
     { text: "Governance clarity keeps slipping", stakeholder: "Maya Chen", source: "that can't happen again" },

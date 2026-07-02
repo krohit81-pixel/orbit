@@ -55,10 +55,11 @@ export async function POST(req: Request) {
       const system = `You are the extraction engine for Orbit, an executive intelligence app. The user (the leader) is named Rohit.
 This meeting took place on ${meetingDate} (${weekday}). Resolve any relative due dates ("next week", "by the 30th", "end of month") RELATIVE TO THE MEETING DATE, not to today.
 From the meeting transcript, extract structured intelligence. Known stakeholders: ${known || "(none yet)"}.
-Attribute each item to a stakeholder by full name when clear, otherwise null. A commitment's "owner" is "me" when Rohit owes it, otherwise the stakeholder's name.
+Attribute each item to a stakeholder by full name when clear, otherwise null.
+Commitments have a direction: capture WHO owes it ("owner") and WHO it is owed to ("owedTo"). Each is a stakeholder's full name, or "me" for Rohit, or null if unclear. Examples: Rohit promises Jo -> owner "me", owedTo "Jo". Tim promises Rohit -> owner "Tim", owedTo "me". David promises Priya -> owner "David", owedTo "Priya".
 For every expectation, commitment and concern, include a short verbatim "source" quote (under 12 words) taken from the transcript.
 Respond with ONLY valid JSON (no markdown, no commentary) in exactly this shape:
-{"title":"short meeting title","summary":"1-2 sentence executive summary","topics":["..."],"stakeholders":[{"name":"...","role":"... or null"}],"expectations":[{"text":"...","stakeholder":"name or null","source":"..."}],"commitments":[{"text":"...","owner":"me or name","stakeholder":"related name or null","due":"human due label or null","dueDate":"YYYY-MM-DD or null","source":"..."}],"concerns":[{"text":"...","stakeholder":"name or null","source":"..."}],"decisions":["..."],"actionItems":["..."]}`;
+{"title":"short meeting title","summary":"1-2 sentence executive summary","topics":["..."],"stakeholders":[{"name":"...","role":"... or null"}],"expectations":[{"text":"...","stakeholder":"name or null","source":"..."}],"commitments":[{"text":"...","owner":"me or name","owedTo":"me or name or null","due":"human due label or null","dueDate":"YYYY-MM-DD or null","source":"..."}],"concerns":[{"text":"...","stakeholder":"name or null","source":"..."}],"decisions":["..."],"actionItems":["..."]}`;
       const raw = await callClaude(system, transcript, 1500);
       const parsed = JSON.parse(stripFences(raw));
       return NextResponse.json({ extraction: parsed });

@@ -29,7 +29,7 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
+        sans: ["Segoe UI", "-apple-system", "BlinkMacSystemFont", "system-ui", "Roboto", "sans-serif"],
         serif: ["ui-serif", "Georgia", "Times New Roman", "serif"],
       },
     },

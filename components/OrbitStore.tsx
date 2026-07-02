@@ -69,6 +69,7 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
       map[p.name.toLowerCase().trim()] = id;
     });
     const resolve = (n?: string | null) => (n ? map[n.toLowerCase().trim()] || null : null);
+    const resolveParty = (n?: string | null) => (n === "me" ? "me" : resolve(n));
 
     const meeting: Meeting = {
       id: uid(),
@@ -78,7 +79,7 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
       topics: review.topics,
       mentioned: review.people.filter((p) => p.include).map((p) => resolve(p.name)).filter((x): x is string => !!x),
       expectations: review.expectations.filter((e) => e.include).map((e) => ({ id: uid(), text: e.text, stakeholderId: resolve(e.stakeholder), source: e.source, status: "open" as const })),
-      commitments: review.commitments.filter((e) => e.include).map((e) => ({ id: uid(), text: e.text, owedByMe: e.owner === "me", stakeholderId: resolve(e.stakeholder || (e.owner !== "me" ? e.owner : null)), due: e.due, dueDate: e.dueDate ?? null, source: e.source, status: "open" as const })),
+      commitments: review.commitments.filter((e) => e.include).map((e) => ({ id: uid(), text: e.text, ownerId: resolveParty(e.owner), owedToId: resolveParty(e.owedTo), due: e.due, dueDate: e.dueDate ?? null, source: e.source, status: "open" as const })),
       concerns: review.concerns.filter((e) => e.include).map((e) => ({ id: uid(), text: e.text, stakeholderId: resolve(e.stakeholder), source: e.source })),
       decisions: review.decisions,
       actionItems: review.actionItems,
@@ -105,14 +106,18 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
         const refs =
           m.mentioned.includes(id) ||
           m.expectations.some((e) => e.stakeholderId === id) ||
-          m.commitments.some((e) => e.stakeholderId === id) ||
+          m.commitments.some((e) => e.ownerId === id || e.owedToId === id) ||
           m.concerns.some((e) => e.stakeholderId === id);
         if (!refs) return m;
         const next: Meeting = {
           ...m,
           mentioned: m.mentioned.filter((x) => x !== id),
           expectations: m.expectations.map((e) => (e.stakeholderId === id ? { ...e, stakeholderId: null } : e)),
-          commitments: m.commitments.map((e) => (e.stakeholderId === id ? { ...e, stakeholderId: null } : e)),
+          commitments: m.commitments.map((e) => ({
+            ...e,
+            ownerId: e.ownerId === id ? null : e.ownerId,
+            owedToId: e.owedToId === id ? null : e.owedToId,
+          })),
           concerns: m.concerns.map((e) => (e.stakeholderId === id ? { ...e, stakeholderId: null } : e)),
         };
         touched.push(next);

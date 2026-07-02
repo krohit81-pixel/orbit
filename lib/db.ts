@@ -1,6 +1,7 @@
 import { supabase } from "./supabase/client";
 import { seedData } from "./seed";
-import type { Meeting, Stakeholder } from "./types";
+import type { Commitment, Meeting, Stakeholder } from "./types";
+import { SELF } from "./utils";
 
 const USER = "rohit"; // single-user V1; becomes auth.uid() when auth is added
 
@@ -16,6 +17,32 @@ type MeetingRow = {
 };
 
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+
+// Migrate legacy commitments ({owedByMe, stakeholderId}) to directional ({ownerId, owedToId}).
+function normCommitment(raw: Record<string, unknown>): Commitment {
+  if ("ownerId" in raw || "owedToId" in raw) {
+    return {
+      id: String(raw.id), text: String(raw.text ?? ""),
+      ownerId: (raw.ownerId as string | null) ?? null,
+      owedToId: (raw.owedToId as string | null) ?? null,
+      due: (raw.due as string | null) ?? null,
+      dueDate: (raw.dueDate as string | null) ?? null,
+      source: raw.source as string | undefined,
+      status: (raw.status as "open" | "done") ?? "open",
+    };
+  }
+  const owedByMe = Boolean(raw.owedByMe);
+  const other = (raw.stakeholderId as string | null) ?? null;
+  return {
+    id: String(raw.id), text: String(raw.text ?? ""),
+    ownerId: owedByMe ? SELF : other,
+    owedToId: owedByMe ? other : SELF,
+    due: (raw.due as string | null) ?? null,
+    dueDate: (raw.dueDate as string | null) ?? null,
+    source: raw.source as string | undefined,
+    status: (raw.status as "open" | "done") ?? "open",
+  };
+}
 
 function toStakeholder(r: StakeholderRow): Stakeholder {
   return {
@@ -37,7 +64,7 @@ function toMeeting(r: MeetingRow): Meeting {
     topics: arr<string>(r.topics),
     mentioned: arr<string>(r.mentioned),
     expectations: arr<Meeting["expectations"][number]>(r.expectations),
-    commitments: arr<Meeting["commitments"][number]>(r.commitments),
+    commitments: arr<Record<string, unknown>>(r.commitments).map(normCommitment),
     concerns: arr<Meeting["concerns"][number]>(r.concerns),
     decisions: arr<string>(r.decisions),
     actionItems: arr<string>(r.action_items),

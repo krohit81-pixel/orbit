@@ -1,21 +1,25 @@
 "use client";
 
-import { Search, ChevronRight } from "lucide-react";
+import { useState } from "react";
+import { Search, ChevronRight, ChevronDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Eyebrow, SectionTitle, DueLabel } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
-import { fmtDate, intel, myOpenCommitments, stakeholderById } from "@/lib/utils";
+import {
+  fmtFull, intel, openCommitmentsInvolvingMe, otherParty, commitmentLabel,
+  bucketDue, stakeholderById, type OpenCommitment,
+} from "@/lib/utils";
 
 export function HomeScreen() {
   const { self, stakeholders, meetings } = useOrbit();
   const { go } = useFlow();
-  const open = myOpenCommitments(meetings);
+  const open = openCommitmentsInvolvingMe(meetings);
 
-  // person-first grouping: commitments by the stakeholder they relate to
-  const groups = new Map<string, typeof open>();
+  // group by the other party
+  const groups = new Map<string, OpenCommitment[]>();
   open.forEach((cm) => {
-    const key = cm.stakeholderId ?? "__unassigned";
+    const key = otherParty(cm) ?? "__unassigned";
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(cm);
   });
@@ -26,6 +30,14 @@ export function HomeScreen() {
   });
   groupList.forEach(([, items]) => items.sort((x, y) => (x.dueDate || "9999").localeCompare(y.dueDate || "9999")));
 
+  // smart default: expand groups that have something overdue or due this week
+  const urgent = (items: OpenCommitment[]) => items.some((c) => ["overdue", "week"].includes(bucketDue(c.dueDate)));
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const isOpen = (key: string, items: OpenCommitment[]) =>
+    key in collapsed ? !collapsed[key] : urgent(items);
+  const toggle = (key: string, items: OpenCommitment[]) =>
+    setCollapsed((c) => ({ ...c, [key]: key in c ? !c[key] : urgent(items) }));
+
   const recent = stakeholders
     .filter((s) => meetings.slice(0, 2).some((m) => m.mentioned.includes(s.id)))
     .slice(0, 3);
@@ -33,11 +45,11 @@ export function HomeScreen() {
   return (
     <div>
       <Eyebrow>Welcome back, {self.name}</Eyebrow>
-      <h1 className="mb-4 mt-1 text-[28px] font-bold leading-tight tracking-tight">What needs your attention</h1>
+      <h1 className="mb-4 mt-1 text-[26px] font-bold leading-tight tracking-tight">What needs your attention</h1>
 
       <button
         onClick={() => go({ screen: "search" })}
-        className="mb-[18px] flex w-full items-center gap-2 rounded-xl bg-secondary px-3.5 py-3 text-sm text-muted-foreground"
+        className="mb-[18px] flex w-full items-center gap-2 rounded-md bg-secondary px-3.5 py-3 text-sm text-muted-foreground"
       >
         <Search className="h-[17px] w-[17px]" /> Search topics, people, commitments…
       </button>
@@ -48,38 +60,49 @@ export function HomeScreen() {
       {meetings.slice(0, 3).map((m) => (
         <Card key={m.id} onClick={() => go({ screen: "meeting", id: m.id })} className="mb-2.5 cursor-pointer">
           <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="font-semibold">{m.title}</div>
-              <span className="text-xs text-muted-foreground/70">{fmtDate(m.date)}</span>
-            </div>
-            <div className="mt-1 text-[13px] leading-snug text-muted-foreground">{m.summary}</div>
+            <div className="font-semibold">{m.title}</div>
+            <div className="mt-0.5 text-[12px] text-muted-foreground/70">{fmtFull(m.date)}</div>
+            <div className="mt-1.5 text-[13px] leading-snug text-muted-foreground">{m.summary}</div>
           </CardContent>
         </Card>
       ))}
 
-      <SectionTitle>Open commitments by stakeholder</SectionTitle>
+      <SectionTitle>Commitments by stakeholder</SectionTitle>
       {open.length === 0 && (
         <Card className="mb-2.5"><CardContent className="text-muted-foreground/70">Nothing outstanding. Clean slate.</CardContent></Card>
       )}
       {groupList.map(([key, items]) => {
         const person = key === "__unassigned" ? null : stakeholderById(stakeholders, key);
+        const openState = isOpen(key, items);
         return (
-          <div key={key} className="mb-1.5">
+          <div key={key} className="mb-2.5 overflow-hidden rounded-md border border-border bg-card">
             <button
-              className="mb-1.5 mt-2 flex items-center gap-1.5"
-              onClick={() => person && go({ screen: "stakeholder", id: person.id })}
+              className="flex w-full items-center justify-between px-3.5 py-2.5"
+              onClick={() => toggle(key, items)}
             >
-              <span className="text-[12px] font-bold tracking-wide text-foreground">{person ? person.name : "Unassigned"}</span>
-              <span className="text-[11px] text-muted-foreground/60">· {items.length}</span>
+              <span className="flex items-center gap-2">
+                <span className="text-[13px] font-bold tracking-tight text-foreground">{person ? person.name : "Unassigned"}</span>
+                <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">{items.length}</span>
+              </span>
+              {openState ? <ChevronDown className="h-4 w-4 text-muted-foreground/60" /> : <ChevronRight className="h-4 w-4 text-muted-foreground/60" />}
             </button>
-            {items.map((cm) => (
-              <Card key={cm.id} className="mb-2.5">
-                <CardContent>
-                  <div className="font-semibold">{cm.text}</div>
-                  <DueLabel dueDate={cm.dueDate} due={cm.due} className="mt-1 block" />
-                </CardContent>
-              </Card>
-            ))}
+            {openState && (
+              <div className="border-t border-border">
+                {items.map((cm) => (
+                  <div
+                    key={cm.id}
+                    className="cursor-pointer border-b border-border px-3.5 py-2.5 last:border-b-0"
+                    onClick={() => go({ screen: "meeting", id: cm.meeting.id })}
+                  >
+                    <div className="text-[14px] font-medium">{cm.text}</div>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <span className="text-[11.5px] font-semibold text-primary">{commitmentLabel(cm, stakeholders)}</span>
+                      <DueLabel dueDate={cm.dueDate} due={cm.due} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
       })}

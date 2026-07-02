@@ -26,11 +26,12 @@ export interface Expectation {
   status: "open" | "met";
 }
 
+// A commitment flows from an owner to a recipient ("me" is the sentinel for the user).
 export interface Commitment {
   id: string;
   text: string;
-  owedByMe: boolean;
-  stakeholderId: string | null;
+  ownerId: string | null;   // "me" | stakeholderId | null (who owes)
+  owedToId: string | null;  // "me" | stakeholderId | null (who it's owed to)
   due?: string | null;
   dueDate?: string | null;
   source?: string;
@@ -66,7 +67,7 @@ export interface Extraction {
   topics: string[];
   stakeholders: ExtractedPerson[];
   expectations: { text: string; stakeholder?: string | null; source?: string }[];
-  commitments: { text: string; owner: string; stakeholder?: string | null; due?: string | null; dueDate?: string | null; source?: string }[];
+  commitments: { text: string; owner: string; owedTo?: string | null; due?: string | null; dueDate?: string | null; source?: string }[];
   concerns: { text: string; stakeholder?: string | null; source?: string }[];
   decisions: string[];
   actionItems: string[];
@@ -81,7 +82,7 @@ export interface ReviewModel {
   topics: string[];
   people: ReviewPerson[];
   expectations: (ReviewItem & { text: string; stakeholder?: string | null; source?: string })[];
-  commitments: (ReviewItem & { text: string; owner: string; stakeholder?: string | null; due?: string | null; dueDate?: string | null; source?: string })[];
+  commitments: (ReviewItem & { text: string; owner: string; owedTo: string | null; due?: string | null; dueDate?: string | null; source?: string })[];
   concerns: (ReviewItem & { text: string; stakeholder?: string | null; source?: string })[];
   decisions: string[];
   actionItems: string[];

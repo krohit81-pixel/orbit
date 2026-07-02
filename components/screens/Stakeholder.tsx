@@ -31,7 +31,8 @@ export function StakeholderScreen({ id }: { id: string }) {
           if (st.expectations.length) parts.push(`Expectations: ${st.expectations.map((e) => e.text).join("; ")}.`);
           if (st.freshConcerns.length) parts.push(`New concerns: ${st.freshConcerns.map((c) => c.text).join("; ")}.`);
           if (st.recurringConcerns.length) parts.push(`Recurring concerns: ${st.recurringConcerns.map((c) => c.text).join("; ")}.`);
-          if (st.commitments.length) parts.push(`You committed: ${st.commitments.map((c) => c.text).join("; ")}.`);
+          if (st.youCommitted.length) parts.push(`You committed: ${st.youCommitted.map((c) => c.text).join("; ")}.`);
+          if (st.theyCommitted.length) parts.push(`They committed: ${st.theyCommitted.map((c) => c.text).join("; ")}.`);
           return parts.join(" ");
         })
         .join("\n");
@@ -43,7 +44,7 @@ export function StakeholderScreen({ id }: { id: string }) {
       const data = await res.json();
       if (data.summary) await setSummary(id, data.summary);
     } catch {
-      /* leave existing summary on failure */
+      /* keep existing summary on failure */
     } finally {
       setBusy(false);
     }
@@ -66,14 +67,14 @@ export function StakeholderScreen({ id }: { id: string }) {
         )}
       </div>
 
-      <Card className="mb-4 mt-3 bg-[#FCFBF8]"><CardContent>
+      <Card className="mb-4 mt-3 bg-accent/40"><CardContent>
         <div className="flex items-center justify-between">
           <Eyebrow>Relationship summary</Eyebrow>
           <button onClick={regenerate} className="flex items-center gap-1 text-[11px] font-semibold text-primary disabled:opacity-50" disabled={busy}>
             <RefreshCw className={`h-3 w-3 ${busy ? "animate-spin" : ""}`} /> {busy ? "Synthesizing…" : "Regenerate"}
           </button>
         </div>
-        <div className="mt-2 font-serif text-[16.5px] leading-relaxed">{s.summary}</div>
+        <div className="mt-2 text-[15px] leading-relaxed">{s.summary}</div>
         <div className="mt-2.5 text-[11px] text-muted-foreground/60">
           {s.summaryGeneratedAt ? `Synthesized ${fmtStamp(s.summaryGeneratedAt)} · ${it.interactions.length} interaction(s)` : `Based on ${it.interactions.length} interaction(s)`}
         </div>
@@ -111,10 +112,14 @@ export function StakeholderScreen({ id }: { id: string }) {
               {st.recurringConcerns.map((cn) => (
                 <div key={cn.id} className="text-[12.5px] text-muted-foreground"><span className="font-semibold text-warm">Raised again:</span> {cn.text}</div>
               ))}
-              {st.commitments.map((cm) => (
+              {st.youCommitted.map((cm) => (
                 <div key={cm.id} className="text-[12.5px] text-muted-foreground">
-                  <span className="font-semibold text-foreground">You committed:</span> {cm.text}
-                  {cm.status === "done" ? " · fulfilled" : ""}
+                  <span className="font-semibold text-foreground">You committed:</span> {cm.text}{cm.status === "done" ? " · fulfilled" : ""}
+                </div>
+              ))}
+              {st.theyCommitted.map((cm) => (
+                <div key={cm.id} className="text-[12.5px] text-muted-foreground">
+                  <span className="font-semibold text-foreground">They committed:</span> {cm.text}{cm.status === "done" ? " · done" : ""}
                 </div>
               ))}
             </div>
@@ -125,19 +130,34 @@ export function StakeholderScreen({ id }: { id: string }) {
       {it.exps.length > 0 && (
         <div className="mb-4">
           <SectionTitle>Open expectations from you</SectionTitle>
-          {it.exps.map((e) => (
+          {it.exps.map(({ e, meeting }) => (
             <Card key={e.id} className="mb-2.5"><CardContent>
               <div className="font-semibold">{e.text}</div>
               <SourceQuote>{e.source}</SourceQuote>
+              <button onClick={() => go({ screen: "meeting", id: meeting.id })} className="mt-1.5 text-[11.5px] font-medium text-primary">
+                Raised in {meeting.title} · {fmtFull(meeting.date)}
+              </button>
             </CardContent></Card>
           ))}
         </div>
       )}
 
-      {it.comms.length > 0 && (
+      {it.owesYou.length > 0 && (
         <div className="mb-4">
-          <SectionTitle>Open commitments</SectionTitle>
-          {it.comms.map((cm) => (
+          <SectionTitle>What they owe you</SectionTitle>
+          {it.owesYou.map((cm) => (
+            <Card key={cm.id} className="mb-2.5"><CardContent className="flex items-center justify-between">
+              <div className="font-semibold">{cm.text}</div>
+              <DueLabel dueDate={cm.dueDate} due={cm.due} />
+            </CardContent></Card>
+          ))}
+        </div>
+      )}
+
+      {it.youOwe.length > 0 && (
+        <div className="mb-4">
+          <SectionTitle>What you owe them</SectionTitle>
+          {it.youOwe.map((cm) => (
             <Card key={cm.id} className="mb-2.5"><CardContent className="flex items-center justify-between">
               <div className="font-semibold">{cm.text}</div>
               <DueLabel dueDate={cm.dueDate} due={cm.due} />

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Eyebrow, SectionTitle, SourceQuote, DueLabel } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
-import { fmtDate, stakeholderById } from "@/lib/utils";
+import { fmtFull, stakeholderById, commitmentLabel } from "@/lib/utils";
 
 export function MeetingScreen({ id }: { id: string }) {
   const { meetings, stakeholders, toggleCommitment } = useOrbit();
@@ -23,12 +23,12 @@ export function MeetingScreen({ id }: { id: string }) {
         </button>
       </div>
       <div className="text-2xl font-bold tracking-tight">{m.title}</div>
-      <div className="mb-3.5 mt-0.5 text-[13px] text-muted-foreground/70">{fmtDate(m.date)}</div>
+      <div className="mb-3.5 mt-0.5 text-[13px] text-muted-foreground/70">{fmtFull(m.date)}</div>
 
-      <Card className="mb-[18px] bg-[#FCFBF8]">
+      <Card className="mb-[18px] bg-accent/40">
         <CardContent>
           <Eyebrow>Executive summary</Eyebrow>
-          <div className="mt-2 font-serif text-[16.5px] leading-relaxed">{m.summary}</div>
+          <div className="mt-2 text-[16px] leading-relaxed">{m.summary}</div>
         </CardContent>
       </Card>
 
@@ -65,7 +65,7 @@ export function MeetingScreen({ id }: { id: string }) {
               <div className="flex-1">
                 <div className={cm.status === "done" ? "font-semibold text-muted-foreground/60 line-through" : "font-semibold"}>{cm.text}</div>
                 <div className="mt-1 flex items-center gap-2">
-                  <Badge variant="accent">{cm.owedByMe ? "You owe" : stakeholderById(stakeholders, cm.stakeholderId)?.name}</Badge>
+                  <Badge variant="accent">{commitmentLabel(cm, stakeholders)}</Badge>
                   <DueLabel dueDate={cm.dueDate} due={cm.due} />
                 </div>
                 <SourceQuote>{cm.source}</SourceQuote>

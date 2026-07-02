@@ -23,6 +23,21 @@ export function ReviewScreen() {
     } as ReviewModel);
   };
 
+  const setCommitment = (id: string, patch: Record<string, unknown>) =>
+    setReview({ ...r, commitments: r.commitments.map((x) => (x._id === id ? { ...x, ...patch } : x)) } as ReviewModel);
+
+  const PartySelect = ({ value, onChange, allowNone }: { value: string; onChange: (v: string) => void; allowNone?: boolean }) => (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="h-8 rounded-md border border-input bg-card px-2 text-[12px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <option value="me">You</option>
+      {allowNone && <option value="">—</option>}
+      {r.people.map((p) => <option key={p._id} value={p.name}>{p.name}</option>)}
+    </select>
+  );
+
   const includedCount =
     [...r.people, ...r.expectations, ...r.commitments, ...r.concerns].filter((x) => x.include).length;
 
@@ -42,11 +57,11 @@ export function ReviewScreen() {
         Nothing is saved yet. Drop anything that&apos;s wrong, then commit what&apos;s right to your knowledge base.
       </p>
 
-      <Card className="mb-4 bg-[#FCFBF8]"><CardContent>
+      <Card className="mb-4 bg-accent/40"><CardContent>
         <Eyebrow>Proposed title, date &amp; summary</Eyebrow>
         <Input className="mt-2 font-semibold" value={r.title} onChange={(e) => setReview({ ...r, title: e.target.value })} />
         <Input type="date" className="mt-2 w-auto" value={r.date} onChange={(e) => setReview({ ...r, date: e.target.value })} />
-        <div className="mt-2.5 font-serif text-[15.5px] leading-relaxed">{r.summary}</div>
+        <div className="mt-2.5 text-[15px] leading-relaxed">{r.summary}</div>
       </CardContent></Card>
 
       <SectionTitle>People ({r.people.filter((p) => p.include).length})</SectionTitle>
@@ -82,10 +97,12 @@ export function ReviewScreen() {
               <Toggle on={x.include} onClick={() => toggle("commitments", x._id)} />
               <div className="flex-1">
                 <div className="font-semibold">{x.text}</div>
-                <div className="mt-1 flex items-center gap-2">
-                  <Badge variant="accent">{x.owner === "me" ? "You owe" : x.owner}</Badge>
-                  <DueLabel dueDate={x.dueDate} due={x.due} />
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <PartySelect value={x.owner} onChange={(v) => setCommitment(x._id, { owner: v })} />
+                  <span className="text-[12px] text-muted-foreground">owes</span>
+                  <PartySelect value={x.owedTo ?? ""} onChange={(v) => setCommitment(x._id, { owedTo: v || null })} allowNone />
                 </div>
+                <DueLabel dueDate={x.dueDate} due={x.due} className="mt-1.5 block" />
                 <SourceQuote>{x.source}</SourceQuote>
               </div>
             </CardContent></Card>

@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
-import { intel, fmtDate } from "@/lib/utils";
+import { intel, fmtFull } from "@/lib/utils";
 
 export function PeopleScreen() {
   const { stakeholders, meetings } = useOrbit();
@@ -44,7 +44,7 @@ export function PeopleScreen() {
                 <Badge variant="accent">{s.relationship}</Badge>
               </div>
               <div className="mt-2.5 text-[12.5px] text-muted-foreground/70">
-                {it.interactions[0] ? `Last interaction · ${fmtDate(it.interactions[0].date)}` : "No interactions yet"} · {it.exps.length} open expectation(s)
+                {it.interactions[0] ? `Last interaction · ${fmtFull(it.interactions[0].date)}` : "No interactions yet"} · {it.exps.length} open expectation(s)
               </div>
             </CardContent>
           </Card>
