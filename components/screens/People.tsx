@@ -36,10 +36,10 @@ export function PeopleScreen() {
         return (
           <Card key={s.id} onClick={() => go({ screen: "stakeholder", id: s.id })} className="mb-2.5 cursor-pointer">
             <CardContent>
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-base font-semibold">{s.name}</div>
-                  <div className="text-[13px] text-muted-foreground">{s.title}</div>
+              <div className="flex items-start justify-between gap-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-base font-semibold">{s.name}</div>
+                  <div className="truncate text-[13px] text-muted-foreground">{s.title}</div>
                 </div>
                 <Badge variant="accent">{s.relationship}</Badge>
               </div>

@@ -26,14 +26,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-paper/90 px-[18px] py-2.5 backdrop-blur">
           <button onClick={() => go({ screen: "home" })} className="flex items-baseline gap-1.5 text-[15px] font-bold tracking-tight">
             Orbit
-            <span className="text-[10.5px] font-medium text-muted-foreground/60">v1.2.1</span>
+            <span className="text-[10.5px] font-medium text-muted-foreground/60">v1.3.0</span>
           </button>
           <span className="text-[11px] font-medium text-muted-foreground/70">{fmtToday()}</span>
         </header>
         <div className="app-scroll flex-1 overflow-y-auto px-[18px] pb-24 pt-4">
           {children}
           <div className="mt-10 text-center text-[11px] tracking-wide text-muted-foreground/60">
-            Orbit · Rohit
+            Orbit · Rohit Kohli
           </div>
         </div>
         <nav className="sticky bottom-0 flex border-t border-border bg-paper/90 px-1.5 pb-2.5 pt-2 backdrop-blur">

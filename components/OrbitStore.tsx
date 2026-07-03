@@ -140,14 +140,25 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const toggleCommitment = useCallback(async (meetingId: string, commId: string) => {
+    let prevCommitments: Meeting["commitments"] | null = null;
     let nextCommitments: Meeting["commitments"] | null = null;
     setMeetings((prev) => prev.map((m) => {
       if (m.id !== meetingId) return m;
+      prevCommitments = m.commitments;
       const commitments = m.commitments.map((cm) => cm.id === commId ? { ...cm, status: (cm.status === "done" ? "open" : "done") as "open" | "done" } : cm);
       nextCommitments = commitments;
       return { ...m, commitments };
     }));
-    if (nextCommitments) await db.updateMeeting(meetingId, { commitments: nextCommitments });
+    if (!nextCommitments) return;
+    try {
+      await db.updateMeeting(meetingId, { commitments: nextCommitments });
+    } catch (e) {
+      // DB write failed (e.g. RLS policy) — roll back the optimistic toggle so the UI
+      // doesn't show a "done" state that never actually saved.
+      setMeetings((prev) => prev.map((m) => (m.id === meetingId && prevCommitments ? { ...m, commitments: prevCommitments } : m)));
+      const msg = e instanceof Error ? e.message : "Could not save this change.";
+      if (typeof window !== "undefined") window.alert(`Couldn't save: ${msg}\nYour change was not saved — please try again.`);
+    }
   }, []);
 
   const setSummary = useCallback(async (sid: string, summary: string) => {

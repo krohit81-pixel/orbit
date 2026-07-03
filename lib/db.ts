@@ -18,6 +18,16 @@ type MeetingRow = {
 
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
+// Supabase-js returns { error } instead of throwing. Writes were being silently dropped
+// (e.g. by an RLS policy) with no signal, so the UI updated optimistically and then reverted
+// on next refresh because nothing had actually landed in Postgres. This makes failures loud.
+function check(op: string, error: { message: string } | null) {
+  if (error) {
+    console.error(`[orbit/db] ${op} failed:`, error.message);
+    throw new Error(`${op} failed: ${error.message}`);
+  }
+}
+
 // Migrate legacy commitments ({owedByMe, stakeholderId}) to directional ({ownerId, owedToId}).
 function normCommitment(raw: Record<string, unknown>): Commitment {
   if ("ownerId" in raw || "owedToId" in raw) {
@@ -97,29 +107,29 @@ export async function seedIfEmpty(): Promise<void> {
   const { count } = await supabase.from("stakeholders").select("id", { count: "exact", head: true }).eq("user_id", USER);
   if (count && count > 0) return;
   const { stakeholders, meetings } = seedData();
-  await supabase.from("stakeholders").insert(stakeholders.map(stakeholderRow));
-  await supabase.from("meetings").insert(meetings.map(meetingRow));
+  check("seed stakeholders", (await supabase.from("stakeholders").insert(stakeholders.map(stakeholderRow))).error);
+  check("seed meetings", (await supabase.from("meetings").insert(meetings.map(meetingRow))).error);
 }
 
 // ---- writes ----
 export async function insertStakeholder(s: Stakeholder) {
-  await supabase.from("stakeholders").insert(stakeholderRow(s));
+  check("insertStakeholder", (await supabase.from("stakeholders").insert(stakeholderRow(s))).error);
 }
 export async function insertStakeholders(list: Stakeholder[]) {
-  if (list.length) await supabase.from("stakeholders").insert(list.map(stakeholderRow));
+  if (list.length) check("insertStakeholders", (await supabase.from("stakeholders").insert(list.map(stakeholderRow))).error);
 }
 export async function insertMeeting(m: Meeting) {
-  await supabase.from("meetings").insert(meetingRow(m));
+  check("insertMeeting", (await supabase.from("meetings").insert(meetingRow(m))).error);
 }
 export async function updateMeeting(id: string, patch: Partial<ReturnType<typeof meetingRow>>) {
-  await supabase.from("meetings").update(patch).eq("id", id);
+  check("updateMeeting", (await supabase.from("meetings").update(patch).eq("id", id).eq("user_id", USER)).error);
 }
 export async function saveMeeting(m: Meeting) {
   const { id, ...rest } = meetingRow(m);
-  await supabase.from("meetings").update(rest).eq("id", id);
+  check("saveMeeting", (await supabase.from("meetings").update(rest).eq("id", id).eq("user_id", USER)).error);
 }
 export async function deleteMeeting(id: string) {
-  await supabase.from("meetings").delete().eq("id", id);
+  check("deleteMeeting", (await supabase.from("meetings").delete().eq("id", id).eq("user_id", USER)).error);
 }
 
 export async function updateStakeholder(
@@ -133,8 +143,8 @@ export async function updateStakeholder(
   if (patch.reportsTo !== undefined) row.reports_to = patch.reportsTo;
   if (patch.summary !== undefined) row.summary = patch.summary;
   if (patch.summaryGeneratedAt !== undefined) row.summary_generated_at = patch.summaryGeneratedAt;
-  await supabase.from("stakeholders").update(row).eq("id", id);
+  check("updateStakeholder", (await supabase.from("stakeholders").update(row).eq("id", id).eq("user_id", USER)).error);
 }
 export async function deleteStakeholder(id: string) {
-  await supabase.from("stakeholders").delete().eq("id", id);
+  check("deleteStakeholder", (await supabase.from("stakeholders").delete().eq("id", id).eq("user_id", USER)).error);
 }
