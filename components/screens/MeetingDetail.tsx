@@ -46,7 +46,11 @@ export function MeetingScreen({ id }: { id: string }) {
             <Card key={e.id} className="mb-2.5"><CardContent>
               <div className="flex justify-between gap-2">
                 <div className="font-semibold">{e.text}</div>
-                {e.stakeholderId && <Badge>{stakeholderById(stakeholders, e.stakeholderId)?.name}</Badge>}
+                {e.stakeholderId && (
+                  <span className="shrink-0 text-[12px] font-medium text-muted-foreground">
+                    {stakeholderById(stakeholders, e.stakeholderId)?.name}
+                  </span>
+                )}
               </div>
               <SourceQuote>{e.source}</SourceQuote>
             </CardContent></Card>
@@ -65,7 +69,7 @@ export function MeetingScreen({ id }: { id: string }) {
               <div className="flex-1">
                 <div className={cm.status === "done" ? "font-semibold text-muted-foreground/60 line-through" : "font-semibold"}>{cm.text}</div>
                 <div className="mt-1 flex items-center gap-2">
-                  <Badge variant="accent">{commitmentLabel(cm, stakeholders)}</Badge>
+                  <span className="text-[12px] font-medium text-muted-foreground">{commitmentLabel(cm, stakeholders)}</span>
                   <DueLabel dueDate={cm.dueDate} due={cm.due} />
                 </div>
                 <SourceQuote>{cm.source}</SourceQuote>
@@ -97,8 +101,8 @@ export function MeetingScreen({ id }: { id: string }) {
       {m.mentioned.length > 0 && (
         <div className="mb-[18px]">
           <SectionTitle>Stakeholders mentioned</SectionTitle>
-          <div className="flex flex-wrap gap-1.5">
-            {m.mentioned.map((sid) => <Badge key={sid} variant="accent">{stakeholderById(stakeholders, sid)?.name}</Badge>)}
+          <div className="text-[12.5px] text-muted-foreground">
+            {m.mentioned.map((sid) => stakeholderById(stakeholders, sid)?.name).filter(Boolean).join(" · ")}
           </div>
         </div>
       )}
