@@ -16,6 +16,12 @@ type MeetingRow = {
   concerns: unknown; decisions: unknown; action_items: unknown;
 };
 
+// `shared` schema holds tables also read by other apps on this Supabase project
+// (currently just Risk Dashboard, in its own `risk_dashboard` schema).
+// `orbit` schema holds tables specific to this app.
+const stakeholdersTable = () => supabase.schema("shared").from("stakeholders");
+const meetingsTable = () => supabase.schema("orbit").from("meetings");
+
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
 // Supabase-js returns { error } instead of throwing. Writes were being silently dropped
@@ -94,8 +100,8 @@ function meetingRow(m: Meeting) {
 // ---- reads ----
 export async function fetchAll(): Promise<{ stakeholders: Stakeholder[]; meetings: Meeting[] }> {
   const [{ data: s }, { data: m }] = await Promise.all([
-    supabase.from("stakeholders").select("*").eq("user_id", USER),
-    supabase.from("meetings").select("*").eq("user_id", USER).order("date", { ascending: false }),
+    stakeholdersTable().select("*").eq("user_id", USER),
+    meetingsTable().select("*").eq("user_id", USER).order("date", { ascending: false }),
   ]);
   return {
     stakeholders: (s as StakeholderRow[] | null ?? []).map(toStakeholder),
@@ -104,32 +110,32 @@ export async function fetchAll(): Promise<{ stakeholders: Stakeholder[]; meeting
 }
 
 export async function seedIfEmpty(): Promise<void> {
-  const { count } = await supabase.from("stakeholders").select("id", { count: "exact", head: true }).eq("user_id", USER);
+  const { count } = await stakeholdersTable().select("id", { count: "exact", head: true }).eq("user_id", USER);
   if (count && count > 0) return;
   const { stakeholders, meetings } = seedData();
-  check("seed stakeholders", (await supabase.from("stakeholders").insert(stakeholders.map(stakeholderRow))).error);
-  check("seed meetings", (await supabase.from("meetings").insert(meetings.map(meetingRow))).error);
+  check("seed stakeholders", (await stakeholdersTable().insert(stakeholders.map(stakeholderRow))).error);
+  check("seed meetings", (await meetingsTable().insert(meetings.map(meetingRow))).error);
 }
 
 // ---- writes ----
 export async function insertStakeholder(s: Stakeholder) {
-  check("insertStakeholder", (await supabase.from("stakeholders").insert(stakeholderRow(s))).error);
+  check("insertStakeholder", (await stakeholdersTable().insert(stakeholderRow(s))).error);
 }
 export async function insertStakeholders(list: Stakeholder[]) {
-  if (list.length) check("insertStakeholders", (await supabase.from("stakeholders").insert(list.map(stakeholderRow))).error);
+  if (list.length) check("insertStakeholders", (await stakeholdersTable().insert(list.map(stakeholderRow))).error);
 }
 export async function insertMeeting(m: Meeting) {
-  check("insertMeeting", (await supabase.from("meetings").insert(meetingRow(m))).error);
+  check("insertMeeting", (await meetingsTable().insert(meetingRow(m))).error);
 }
 export async function updateMeeting(id: string, patch: Partial<ReturnType<typeof meetingRow>>) {
-  check("updateMeeting", (await supabase.from("meetings").update(patch).eq("id", id).eq("user_id", USER)).error);
+  check("updateMeeting", (await meetingsTable().update(patch).eq("id", id).eq("user_id", USER)).error);
 }
 export async function saveMeeting(m: Meeting) {
   const { id, ...rest } = meetingRow(m);
-  check("saveMeeting", (await supabase.from("meetings").update(rest).eq("id", id).eq("user_id", USER)).error);
+  check("saveMeeting", (await meetingsTable().update(rest).eq("id", id).eq("user_id", USER)).error);
 }
 export async function deleteMeeting(id: string) {
-  check("deleteMeeting", (await supabase.from("meetings").delete().eq("id", id).eq("user_id", USER)).error);
+  check("deleteMeeting", (await meetingsTable().delete().eq("id", id).eq("user_id", USER)).error);
 }
 
 export async function updateStakeholder(
@@ -143,8 +149,8 @@ export async function updateStakeholder(
   if (patch.reportsTo !== undefined) row.reports_to = patch.reportsTo;
   if (patch.summary !== undefined) row.summary = patch.summary;
   if (patch.summaryGeneratedAt !== undefined) row.summary_generated_at = patch.summaryGeneratedAt;
-  check("updateStakeholder", (await supabase.from("stakeholders").update(row).eq("id", id).eq("user_id", USER)).error);
+  check("updateStakeholder", (await stakeholdersTable().update(row).eq("id", id).eq("user_id", USER)).error);
 }
 export async function deleteStakeholder(id: string) {
-  check("deleteStakeholder", (await supabase.from("stakeholders").delete().eq("id", id).eq("user_id", USER)).error);
+  check("deleteStakeholder", (await stakeholdersTable().delete().eq("id", id).eq("user_id", USER)).error);
 }
