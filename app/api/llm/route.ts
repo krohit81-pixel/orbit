@@ -60,8 +60,15 @@ Commitments have a direction: capture WHO owes it ("owner") and WHO it is owed t
 For every expectation, commitment and concern, include a short verbatim "source" quote (under 12 words) taken from the transcript.
 Respond with ONLY valid JSON (no markdown, no commentary) in exactly this shape:
 {"title":"short meeting title","summary":"1-2 sentence executive summary","topics":["..."],"stakeholders":[{"name":"...","role":"... or null"}],"expectations":[{"text":"...","stakeholder":"name or null","source":"..."}],"commitments":[{"text":"...","owner":"me or name","owedTo":"me or name or null","due":"human due label or null","dueDate":"YYYY-MM-DD or null","source":"..."}],"concerns":[{"text":"...","stakeholder":"name or null","source":"..."}],"decisions":["..."],"actionItems":["..."]}`;
-      const raw = await callClaude(system, transcript, 1500);
-      const parsed = JSON.parse(stripFences(raw));
+      const raw = await callClaude(system, transcript, 8192);
+      let parsed;
+      try {
+        parsed = JSON.parse(stripFences(raw));
+      } catch {
+        throw new Error(
+          "The extraction response wasn't valid JSON (it may have been cut off for a very long transcript). Try again, or split the transcript into smaller sections."
+        );
+      }
       return NextResponse.json({ extraction: parsed });
     }
 

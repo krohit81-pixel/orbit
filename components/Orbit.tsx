@@ -15,7 +15,6 @@ import { EditMeetingScreen } from "./screens/EditMeeting";
 import { CaptureScreen } from "./screens/Capture";
 import { ReviewScreen } from "./screens/Review";
 import { SearchScreen } from "./screens/Search";
-import { SAMPLE_TRANSCRIPT } from "@/lib/seed";
 import { todayISO, uid } from "@/lib/utils";
 import type { Extraction, ReviewModel, ReviewPerson } from "@/lib/types";
 
@@ -71,7 +70,7 @@ const SAMPLE_EXTRACTION: Extraction = {
 function Inner() {
   const store = useOrbit();
   const [view, setView] = useState<View>({ screen: "home" });
-  const [draft, setDraft] = useState(SAMPLE_TRANSCRIPT);
+  const [draft, setDraft] = useState("");
   const [meetingDate, setMeetingDate] = useState(todayISO());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -108,7 +107,7 @@ function Inner() {
     if (!review) return;
     await store.commitMeeting(review);
     setReview(null);
-    setDraft(SAMPLE_TRANSCRIPT);
+    setDraft("");
     setMeetingDate(todayISO());
     setView({ screen: "meetings" });
   };
