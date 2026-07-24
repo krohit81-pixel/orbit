@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { Search, ChevronRight, ChevronDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Eyebrow, SectionTitle, DueLabel } from "@/components/bits";
+import { Eyebrow, SectionTitle, DueLabel, vibrantCard } from "@/components/bits";
+import { cn } from "@/lib/utils";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
 import {
   fmtFull, intel, openCommitmentsInvolvingMe, otherParty, commitmentLabel,
-  bucketDue, stakeholderById, type OpenCommitment,
+  stakeholderById, type OpenCommitment,
 } from "@/lib/utils";
 
 export function HomeScreen() {
@@ -30,13 +31,10 @@ export function HomeScreen() {
   });
   groupList.forEach(([, items]) => items.sort((x, y) => (x.dueDate || "9999").localeCompare(y.dueDate || "9999")));
 
-  // smart default: expand groups that have something overdue or due this week
-  const urgent = (items: OpenCommitment[]) => items.some((c) => ["overdue", "week"].includes(bucketDue(c.dueDate)));
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const isOpen = (key: string, items: OpenCommitment[]) =>
-    key in collapsed ? !collapsed[key] : urgent(items);
-  const toggle = (key: string, items: OpenCommitment[]) =>
-    setCollapsed((c) => ({ ...c, [key]: key in c ? !c[key] : urgent(items) }));
+  // All groups start collapsed; the owner opens the ones they want to look at.
+  const [openKeys, setOpenKeys] = useState<Record<string, boolean>>({});
+  const isOpen = (key: string) => !!openKeys[key];
+  const toggle = (key: string) => setOpenKeys((o) => ({ ...o, [key]: !o[key] }));
 
   const recent = stakeholders
     .filter((s) => meetings.slice(0, 2).some((m) => m.mentioned.includes(s.id)))
@@ -58,7 +56,7 @@ export function HomeScreen() {
         Recent meetings
       </SectionTitle>
       {meetings.slice(0, 3).map((m) => (
-        <Card key={m.id} onClick={() => go({ screen: "meeting", id: m.id })} className="mb-2.5 cursor-pointer">
+        <Card key={m.id} onClick={() => go({ screen: "meeting", id: m.id })} className={cn(vibrantCard, "mb-2.5 cursor-pointer")}>
           <CardContent>
             <div className="font-semibold">{m.title}</div>
             <div className="mt-0.5 text-[12px] text-muted-foreground/70">{fmtFull(m.date)}</div>
@@ -73,12 +71,12 @@ export function HomeScreen() {
       )}
       {groupList.map(([key, items]) => {
         const person = key === "__unassigned" ? null : stakeholderById(stakeholders, key);
-        const openState = isOpen(key, items);
+        const openState = isOpen(key);
         return (
-          <div key={key} className="mb-2.5 overflow-hidden rounded-md border border-border bg-card">
+          <div key={key} className={cn(vibrantCard, "mb-2.5 overflow-hidden rounded-md")}>
             <button
               className="flex w-full items-center justify-between px-3.5 py-2.5"
-              onClick={() => toggle(key, items)}
+              onClick={() => toggle(key)}
             >
               <span className="flex items-center gap-2">
                 <span className="text-[13px] font-bold tracking-tight text-foreground">{person ? person.name : "Unassigned"}</span>
@@ -87,11 +85,11 @@ export function HomeScreen() {
               {openState ? <ChevronDown className="h-4 w-4 text-muted-foreground/60" /> : <ChevronRight className="h-4 w-4 text-muted-foreground/60" />}
             </button>
             {openState && (
-              <div className="border-t border-border">
+              <div className="border-t border-primary/20">
                 {items.map((cm) => (
                   <div
                     key={cm.id}
-                    className="cursor-pointer border-b border-border px-3.5 py-2.5 last:border-b-0"
+                    className="cursor-pointer border-b border-primary/20 px-3.5 py-2.5 last:border-b-0"
                     onClick={() => go({ screen: "meeting", id: cm.meeting.id })}
                   >
                     <div className="text-[14px] font-medium">{cm.text}</div>

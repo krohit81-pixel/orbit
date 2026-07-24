@@ -4,10 +4,10 @@ import { useState } from "react";
 import { ArrowLeft, CircleDot, CheckCircle2, Pencil, ChevronDown, ChevronUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Eyebrow, SectionTitle, SourceQuote, DueLabel } from "@/components/bits";
+import { Eyebrow, SectionTitle, SourceQuote, DueLabel, vibrantCard } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
-import { fmtFull, stakeholderById, commitmentLabel } from "@/lib/utils";
+import { cn, fmtFull, stakeholderById, commitmentLabel } from "@/lib/utils";
 
 export function MeetingScreen({ id }: { id: string }) {
   const { meetings, stakeholders, toggleCommitment } = useOrbit();
@@ -45,15 +45,13 @@ export function MeetingScreen({ id }: { id: string }) {
         <div className="mb-[18px]">
           <SectionTitle>Expectations</SectionTitle>
           {m.expectations.map((e) => (
-            <Card key={e.id} className="mb-2.5"><CardContent>
-              <div className="flex justify-between gap-2">
-                <div className="font-semibold">{e.text}</div>
-                {e.stakeholderId && (
-                  <span className="shrink-0 text-[12px] font-medium text-muted-foreground">
-                    {stakeholderById(stakeholders, e.stakeholderId)?.name}
-                  </span>
-                )}
-              </div>
+            <Card key={e.id} className={cn(vibrantCard, "mb-2.5")}><CardContent>
+              {e.stakeholderId && (
+                <div className="mb-1 text-[11.5px] font-semibold text-primary">
+                  {stakeholderById(stakeholders, e.stakeholderId)?.name}
+                </div>
+              )}
+              <div className="font-semibold">{e.text}</div>
               <SourceQuote>{e.source}</SourceQuote>
             </CardContent></Card>
           ))}
@@ -64,16 +62,16 @@ export function MeetingScreen({ id }: { id: string }) {
         <div className="mb-[18px]">
           <SectionTitle>Commitments</SectionTitle>
           {m.commitments.map((cm) => (
-            <Card key={cm.id} className="mb-2.5"><CardContent className="flex items-start gap-2.5">
+            <Card key={cm.id} className={cn(vibrantCard, "mb-2.5")}><CardContent className="flex items-start gap-2.5">
               <button className="mt-0.5" onClick={() => toggleCommitment(m.id, cm.id)} aria-label="Toggle done">
                 {cm.status === "done" ? <CheckCircle2 className="h-5 w-5 text-[hsl(var(--ring))]" /> : <CircleDot className="h-5 w-5 text-muted-foreground/60" />}
               </button>
               <div className="flex-1">
-                <div className={cm.status === "done" ? "font-semibold text-muted-foreground/60 line-through" : "font-semibold"}>{cm.text}</div>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="text-[12px] font-medium text-muted-foreground">{commitmentLabel(cm, stakeholders)}</span>
+                <div className="mb-1 flex items-center gap-2">
+                  <span className="text-[11.5px] font-semibold text-primary">{commitmentLabel(cm, stakeholders)}</span>
                   <DueLabel dueDate={cm.dueDate} due={cm.due} />
                 </div>
+                <div className={cm.status === "done" ? "font-semibold text-muted-foreground/60 line-through" : "font-semibold"}>{cm.text}</div>
                 <SourceQuote>{cm.source}</SourceQuote>
               </div>
             </CardContent></Card>
@@ -85,7 +83,7 @@ export function MeetingScreen({ id }: { id: string }) {
         <div className="mb-[18px]">
           <SectionTitle>Concerns</SectionTitle>
           {m.concerns.map((e) => (
-            <Card key={e.id} className="mb-2.5"><CardContent>
+            <Card key={e.id} className={cn(vibrantCard, "mb-2.5")}><CardContent>
               <div className="font-semibold">{e.text}</div>
               <SourceQuote>{e.source}</SourceQuote>
             </CardContent></Card>

@@ -4,10 +4,10 @@ import { useState } from "react";
 import { ArrowLeft, RefreshCw, Circle, Pencil } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Eyebrow, SectionTitle, SourceQuote, DueLabel } from "@/components/bits";
+import { Eyebrow, SectionTitle, SourceQuote, DueLabel, vibrantCard } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
-import { intel, trajectory, fmtFull, fmtStamp, stakeholderById } from "@/lib/utils";
+import { cn, intel, trajectory, fmtFull, fmtStamp, stakeholderById } from "@/lib/utils";
 
 export function StakeholderScreen({ id }: { id: string }) {
   const { stakeholders, meetings, setSummary } = useOrbit();
@@ -131,10 +131,10 @@ export function StakeholderScreen({ id }: { id: string }) {
         <div className="mb-4">
           <SectionTitle>Open expectations from you</SectionTitle>
           {it.exps.map(({ e, meeting }) => (
-            <Card key={e.id} className="mb-2.5"><CardContent>
+            <Card key={e.id} className={cn(vibrantCard, "mb-2.5")}><CardContent>
               <div className="font-semibold">{e.text}</div>
               <SourceQuote>{e.source}</SourceQuote>
-              <button onClick={() => go({ screen: "meeting", id: meeting.id })} className="mt-1.5 text-[11.5px] font-medium text-primary">
+              <button onClick={() => go({ screen: "meeting", id: meeting.id })} className="mt-1.5 block w-full text-left text-[11.5px] font-medium text-primary">
                 Raised in {meeting.title} · {fmtFull(meeting.date)}
               </button>
             </CardContent></Card>
@@ -146,9 +146,9 @@ export function StakeholderScreen({ id }: { id: string }) {
         <div className="mb-4">
           <SectionTitle>What they owe you</SectionTitle>
           {it.owesYou.map((cm) => (
-            <Card key={cm.id} className="mb-2.5"><CardContent className="flex items-center justify-between">
+            <Card key={cm.id} className={cn(vibrantCard, "mb-2.5")}><CardContent>
+              <DueLabel dueDate={cm.dueDate} due={cm.due} className="mb-1 block" />
               <div className="font-semibold">{cm.text}</div>
-              <DueLabel dueDate={cm.dueDate} due={cm.due} />
             </CardContent></Card>
           ))}
         </div>
@@ -158,9 +158,9 @@ export function StakeholderScreen({ id }: { id: string }) {
         <div className="mb-4">
           <SectionTitle>What you owe them</SectionTitle>
           {it.youOwe.map((cm) => (
-            <Card key={cm.id} className="mb-2.5"><CardContent className="flex items-center justify-between">
+            <Card key={cm.id} className={cn(vibrantCard, "mb-2.5")}><CardContent>
+              <DueLabel dueDate={cm.dueDate} due={cm.due} className="mb-1 block" />
               <div className="font-semibold">{cm.text}</div>
-              <DueLabel dueDate={cm.dueDate} due={cm.due} />
             </CardContent></Card>
           ))}
         </div>

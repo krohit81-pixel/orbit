@@ -2,6 +2,11 @@ import { Quote } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { bucketDue, fmtFull } from "@/lib/utils";
 
+// Shared "vibrant" card treatment — a soft violet border + tinted shadow, used on the
+// sections the owner wants to feel a bit more alive (recent meetings, commitments,
+// expectations). Deliberately not applied to plain form/edit surfaces.
+export const vibrantCard = "border border-primary/30 bg-card shadow-[0_2px_12px_-2px_rgba(91,95,199,0.25)]";
+
 export function DueLabel({ dueDate, due, className }: { dueDate?: string | null; due?: string | null; className?: string }) {
   if (!dueDate && !due) return null;
   const overdue = dueDate ? bucketDue(dueDate) === "overdue" : false;
