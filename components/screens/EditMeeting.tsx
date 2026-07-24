@@ -135,6 +135,19 @@ export function EditMeetingScreen({ id }: { id: string }) {
         </div>
       )}
 
+      <div className="mb-4">
+        <SectionTitle>Meeting transcript</SectionTitle>
+        <Textarea
+          rows={8}
+          placeholder="Paste or add the original transcript/notes for this meeting…"
+          value={m.transcript ?? ""}
+          onChange={(e) => setField("transcript", e.target.value)}
+        />
+        <p className="mt-1 text-[11.5px] text-muted-foreground/70">
+          Stored for reference. Older meetings may not have one yet — add it here if you want to keep it.
+        </p>
+      </div>
+
       <Button className="mt-2 w-full" onClick={save}><Check className="h-[18px] w-[18px]" /> Save changes</Button>
 
       {!confirming ? (

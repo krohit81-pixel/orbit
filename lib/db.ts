@@ -13,7 +13,7 @@ type StakeholderRow = {
 type MeetingRow = {
   id: string; title: string; date: string; summary: string | null;
   topics: unknown; mentioned: unknown; expectations: unknown; commitments: unknown;
-  concerns: unknown; decisions: unknown; action_items: unknown;
+  concerns: unknown; decisions: unknown; action_items: unknown; transcript: string | null;
 };
 
 // `shared` schema holds tables also read by other apps on this Supabase project
@@ -84,6 +84,7 @@ function toMeeting(r: MeetingRow): Meeting {
     concerns: arr<Meeting["concerns"][number]>(r.concerns),
     decisions: arr<string>(r.decisions),
     actionItems: arr<string>(r.action_items),
+    transcript: r.transcript ?? undefined,
   };
 }
 function stakeholderRow(s: Stakeholder) {
@@ -94,6 +95,7 @@ function meetingRow(m: Meeting) {
     id: m.id, user_id: USER, title: m.title, date: m.date, summary: m.summary,
     topics: m.topics, mentioned: m.mentioned, expectations: m.expectations,
     commitments: m.commitments, concerns: m.concerns, decisions: m.decisions, action_items: m.actionItems,
+    transcript: m.transcript ?? null,
   };
 }
 

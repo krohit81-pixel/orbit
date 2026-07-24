@@ -1,6 +1,7 @@
--- Orbit schema (v1.3+). Run this in the Supabase SQL editor for a FRESH project setup.
+-- Orbit schema (v1.4+). Run this in the Supabase SQL editor for a FRESH project setup.
 -- If you already have data from before v1.3, use supabase/migrations/002_split_schemas.sql
--- instead — this file is the from-scratch reference, not a migration.
+-- first, then supabase/migrations/003_add_meeting_transcript.sql (v1.4) — this file is
+-- the from-scratch reference, not a migration.
 --
 -- This project's Supabase instance is shared with the separate Risk Dashboard app,
 -- which lives in its own `risk_dashboard` schema. Orbit uses two schemas:
@@ -40,6 +41,7 @@ create table if not exists orbit.meetings (
   concerns     jsonb default '[]'::jsonb,
   decisions    jsonb default '[]'::jsonb,
   action_items jsonb default '[]'::jsonb,
+  transcript   text,
   created_at   timestamptz default now()
 );
 

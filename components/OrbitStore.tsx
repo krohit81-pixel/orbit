@@ -83,6 +83,7 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
       concerns: review.concerns.filter((e) => e.include).map((e) => ({ id: uid(), text: e.text, stakeholderId: resolve(e.stakeholder), source: e.source })),
       decisions: review.decisions,
       actionItems: review.actionItems,
+      transcript: review.transcript || undefined,
     };
 
     setStakeholders((prev) => [...prev, ...newStakeholders]);

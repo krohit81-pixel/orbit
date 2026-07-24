@@ -18,7 +18,7 @@ import { SearchScreen } from "./screens/Search";
 import { todayISO, uid } from "@/lib/utils";
 import type { Extraction, ReviewModel, ReviewPerson } from "@/lib/types";
 
-function buildReview(ex: Extraction, knownNames: Set<string>, date: string): ReviewModel {
+function buildReview(ex: Extraction, knownNames: Set<string>, date: string, transcript: string): ReviewModel {
   const names = new Set<string>();
   ex.stakeholders?.forEach((p) => p.name && names.add(p.name));
   ex.expectations?.forEach((x) => x.stakeholder && names.add(x.stakeholder));
@@ -45,6 +45,7 @@ function buildReview(ex: Extraction, knownNames: Set<string>, date: string): Rev
     concerns: (ex.concerns || []).map((x) => ({ ...x, _id: uid(), include: true })),
     decisions: ex.decisions || [],
     actionItems: ex.actionItems || [],
+    transcript,
   };
 }
 
@@ -89,7 +90,7 @@ function Inner() {
       });
       const data = await res.json();
       if (!res.ok || !data.extraction) throw new Error(data.error || "Extraction failed.");
-      setReview(buildReview(data.extraction, knownNames(), meetingDate));
+      setReview(buildReview(data.extraction, knownNames(), meetingDate, draft));
       setView({ screen: "review" });
     } catch (e) {
       setErr((e instanceof Error ? e.message : "Extraction failed.") + " You can load the sample result to continue.");
@@ -99,7 +100,7 @@ function Inner() {
   };
 
   const loadSample = () => {
-    setReview(buildReview(SAMPLE_EXTRACTION, knownNames(), meetingDate));
+    setReview(buildReview(SAMPLE_EXTRACTION, knownNames(), meetingDate, draft));
     setView({ screen: "review" });
   };
 

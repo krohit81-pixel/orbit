@@ -4,6 +4,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Orbit",
   description: "The people and topics in your orbit — synthesized from your conversations.",
+  appleWebApp: {
+    capable: true,
+    title: "Orbit",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {

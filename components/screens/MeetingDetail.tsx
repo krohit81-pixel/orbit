@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowLeft, CircleDot, CheckCircle2, Pencil } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, CircleDot, CheckCircle2, Pencil, ChevronDown, ChevronUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Eyebrow, SectionTitle, SourceQuote, DueLabel } from "@/components/bits";
@@ -11,6 +12,7 @@ import { fmtFull, stakeholderById, commitmentLabel } from "@/lib/utils";
 export function MeetingScreen({ id }: { id: string }) {
   const { meetings, stakeholders, toggleCommitment } = useOrbit();
   const { go } = useFlow();
+  const [showTranscript, setShowTranscript] = useState(false);
   const m = meetings.find((x) => x.id === id);
   if (!m) return <div className="py-10 text-center text-muted-foreground">Meeting not found.</div>;
 
@@ -104,6 +106,23 @@ export function MeetingScreen({ id }: { id: string }) {
           <div className="text-[12.5px] text-muted-foreground">
             {m.mentioned.map((sid) => stakeholderById(stakeholders, sid)?.name).filter(Boolean).join(" · ")}
           </div>
+        </div>
+      )}
+
+      {m.transcript && (
+        <div className="mb-[18px]">
+          <button
+            className="flex w-full items-center justify-between"
+            onClick={() => setShowTranscript((v) => !v)}
+          >
+            <Eyebrow>Meeting transcript</Eyebrow>
+            {showTranscript ? <ChevronUp className="h-4 w-4 text-muted-foreground/70" /> : <ChevronDown className="h-4 w-4 text-muted-foreground/70" />}
+          </button>
+          {showTranscript && (
+            <Card className="mt-2.5"><CardContent>
+              <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-muted-foreground">{m.transcript}</div>
+            </CardContent></Card>
+          )}
         </div>
       )}
     </div>

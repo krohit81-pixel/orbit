@@ -57,6 +57,7 @@ export interface Meeting {
   concerns: Concern[];
   decisions: string[];
   actionItems: string[];
+  transcript?: string; // raw pasted text this meeting was extracted from (v1.4+; older meetings may not have one)
 }
 
 // --- extraction / review shapes ---
@@ -86,4 +87,5 @@ export interface ReviewModel {
   concerns: (ReviewItem & { text: string; stakeholder?: string | null; source?: string })[];
   decisions: string[];
   actionItems: string[];
+  transcript?: string; // the raw pasted text this review was extracted from
 }
