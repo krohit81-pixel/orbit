@@ -29,16 +29,16 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <div className="relative flex min-h-screen w-full max-w-[430px] flex-col bg-paper text-foreground">
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-paper/90 px-[18px] py-2.5 backdrop-blur">
           <div className="flex items-center gap-2">
-            <button onClick={() => go({ screen: "home" })} className="flex items-baseline gap-1.5 text-[15px] font-bold tracking-tight">
-              Orbit
-              <span className="text-[10.5px] font-medium text-muted-foreground/60">v1.5.0</span>
-            </button>
             <button
               onClick={() => setMenuOpen((v) => !v)}
               aria-label="Menu"
               className="rounded-md p-1 text-muted-foreground/70 hover:bg-secondary hover:text-foreground"
             >
               {menuOpen ? <X className="h-[18px] w-[18px]" /> : <Menu className="h-[18px] w-[18px]" />}
+            </button>
+            <button onClick={() => go({ screen: "home" })} className="flex items-baseline gap-1.5 text-[15px] font-bold tracking-tight">
+              Orbit
+              <span className="text-[10.5px] font-medium text-muted-foreground/60">v1.5.0</span>
             </button>
           </div>
           <span className="text-[11px] font-medium text-muted-foreground/70">{fmtToday()}</span>
