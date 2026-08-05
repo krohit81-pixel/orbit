@@ -80,6 +80,23 @@ Respond with ONLY valid JSON (no markdown, no commentary) in exactly this shape:
       return NextResponse.json({ summary });
     }
 
+    if (task === "weeklyReport") {
+      const weekLabel = String(body.weekLabel || "this week");
+      const digest = String(body.digest || "");
+      const system = `You are Orbit's weekly reporting assistant for Rohit, an executive. Based on the structured digest below for the week of ${weekLabel} (meetings held, topics raised, decisions, action items, commitments completed, and commitments due the following week), write a concise weekly report.
+Respond with ONLY valid JSON (no markdown, no commentary) in exactly this shape:
+{"overview":"1-2 sentence plain-English summary of the week","focusAreas":["short bullet phrases — key focus areas this week"],"accomplishments":["short bullet phrases — key accomplishments/decisions this week"],"upcoming":["short bullet phrases — key deliverables/commitments for the upcoming week"]}
+Keep every bullet under 18 words and specific to the digest, not generic. If the digest has nothing for a section, return an empty array for it rather than inventing content. If the digest says no meetings were held this week, say so plainly in "overview".`;
+      const raw = await callClaude(system, digest, 1400);
+      let parsed;
+      try {
+        parsed = JSON.parse(stripFences(raw));
+      } catch {
+        throw new Error("The weekly report response wasn't valid JSON. Please try generating it again.");
+      }
+      return NextResponse.json({ report: parsed });
+    }
+
     return NextResponse.json({ error: "Unknown task." }, { status: 400 });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Extraction failed.";

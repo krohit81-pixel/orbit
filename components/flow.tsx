@@ -13,7 +13,8 @@ export type View =
   | { screen: "stakeholder"; id: string }
   | { screen: "editStakeholder"; id: string }
   | { screen: "meeting"; id: string }
-  | { screen: "editMeeting"; id: string };
+  | { screen: "editMeeting"; id: string }
+  | { screen: "weeklyReport" };
 
 export interface Flow {
   view: View;

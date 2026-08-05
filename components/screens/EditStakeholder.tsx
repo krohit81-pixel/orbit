@@ -5,6 +5,7 @@ import { ArrowLeft, Check, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
 import { RELATIONSHIPS, cn, stakeholderById } from "@/lib/utils";
@@ -21,19 +22,30 @@ export function EditStakeholderScreen({ id }: { id: string }) {
   const [reportsTo, setReportsTo] = useState(s?.reportsTo ?? "");
   const [confirming, setConfirming] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   if (!s) return <div className="py-10 text-center text-muted-foreground">Stakeholder not found.</div>;
 
   const save = async () => {
     if (!name.trim() || saving) return;
     setSaving(true);
-    await saveStakeholder({ ...s, name: name.trim(), title: title.trim() || "—", relationship, reportsTo: reportsTo || null });
-    go({ screen: "stakeholder", id });
+    try {
+      await saveStakeholder({ ...s, name: name.trim(), title: title.trim() || "—", relationship, reportsTo: reportsTo || null });
+      go({ screen: "stakeholder", id });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const doDelete = async () => {
-    await deleteStakeholder(id);
-    go({ screen: "people" });
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await deleteStakeholder(id);
+      go({ screen: "people" });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -83,7 +95,8 @@ export function EditStakeholderScreen({ id }: { id: string }) {
       </div>
 
       <Button className="mt-2 w-full" disabled={!name.trim() || saving} onClick={save}>
-        <Check className="h-[18px] w-[18px]" /> Save changes
+        {saving ? <Spinner className="text-primary-foreground" /> : <Check className="h-[18px] w-[18px]" />}
+        {saving ? "Saving…" : "Save changes"}
       </Button>
 
       {!confirming ? (
@@ -96,8 +109,10 @@ export function EditStakeholderScreen({ id }: { id: string }) {
             Delete <span className="font-semibold text-foreground">{s.name}</span>? Their meetings stay; references to them are cleared.
           </p>
           <div className="mt-3 flex gap-2">
-            <Button variant="warm" className="flex-1" onClick={doDelete}>Yes, delete</Button>
-            <Button variant="secondary" className="flex-1" onClick={() => setConfirming(false)}>Cancel</Button>
+            <Button variant="warm" className="flex-1" disabled={deleting} onClick={doDelete}>
+              {deleting ? <Spinner /> : null} {deleting ? "Deleting…" : "Yes, delete"}
+            </Button>
+            <Button variant="secondary" className="flex-1" disabled={deleting} onClick={() => setConfirming(false)}>Cancel</Button>
           </div>
         </div>
       )}

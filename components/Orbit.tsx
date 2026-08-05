@@ -15,6 +15,8 @@ import { EditMeetingScreen } from "./screens/EditMeeting";
 import { CaptureScreen } from "./screens/Capture";
 import { ReviewScreen } from "./screens/Review";
 import { SearchScreen } from "./screens/Search";
+import { WeeklyReportScreen } from "./screens/WeeklyReport";
+import { Spinner } from "./bits";
 import { todayISO, uid } from "@/lib/utils";
 import type { Extraction, ReviewModel, ReviewPerson } from "@/lib/types";
 
@@ -128,11 +130,16 @@ function Inner() {
     case "capture": body = <CaptureScreen />; break;
     case "review": body = <ReviewScreen />; break;
     case "search": body = <SearchScreen />; break;
+    case "weeklyReport": body = <WeeklyReportScreen />; break;
     default: body = <HomeScreen />;
   }
 
   if (!store.ready) {
-    return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading Orbit…</div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center gap-2 text-muted-foreground">
+        <Spinner className="h-5 w-5" /> Loading Orbit…
+      </div>
+    );
   }
   if (!store.configured) {
     return (

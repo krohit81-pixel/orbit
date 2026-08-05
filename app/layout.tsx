@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { ThemeProvider } from "@/components/ThemeProvider";
+
+const THEME_INIT_SCRIPT = `try{if(localStorage.getItem('orbit-theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}`;
 
 export const metadata: Metadata = {
   title: "Orbit",
@@ -21,7 +24,12 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
     </html>
   );
 }

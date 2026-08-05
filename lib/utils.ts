@@ -31,6 +31,31 @@ export const fmtToday = (): string =>
   new Date().toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
 export const isOverdue = (s?: string | null): boolean => bucketDue(s) === "overdue";
 
+export function addDaysISO(iso: string, days: number): string {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+// Monday-start business week containing the given date.
+export function startOfWeek(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  const day = d.getDay(); // 0 = Sun .. 6 = Sat
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  return addDaysISO(iso, diffToMonday);
+}
+export function weekRange(startISO: string): { start: string; end: string } {
+  return { start: startISO, end: addDaysISO(startISO, 6) };
+}
+export function fmtWeekRange(startISO: string): string {
+  const { end } = weekRange(startISO);
+  const s = new Date(startISO + "T00:00:00");
+  const e = new Date(end + "T00:00:00");
+  const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
+  const sFmt = s.toLocaleDateString("en-GB", { day: "2-digit", month: sameMonth ? undefined : "short" });
+  const eFmt = e.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return `${sFmt} – ${eFmt}`;
+}
+
 export type DueBucket = "overdue" | "week" | "upcoming" | "undated";
 export function bucketDue(s?: string | null): DueBucket {
   if (!s) return "undated";
@@ -92,6 +117,38 @@ function collectCommitments(meetings: Meeting[], predicate: (c: Commitment) => b
 export const myOpenCommitments = (meetings: Meeting[]) => collectCommitments(meetings, (c) => c.ownerId === SELF);
 export const owedToMe = (meetings: Meeting[]) => collectCommitments(meetings, (c) => c.owedToId === SELF && c.ownerId !== SELF);
 export const openCommitmentsInvolvingMe = (meetings: Meeting[]) => collectCommitments(meetings, involvesMe);
+
+// ---- weekly report ----
+// Deterministic data assembly for a Monday-start week; the LLM only turns this into
+// prose (see the "weeklyReport" task in app/api/llm/route.ts) — the facts themselves
+// (which meetings, what topics, what's done, what's due) are computed here, not by the model.
+export interface WeeklyReportData {
+  start: string;
+  end: string;
+  meetings: Meeting[];
+  topics: string[];
+  decisions: string[];
+  actionItems: string[];
+  completed: Commitment[];
+  upcoming: OpenCommitment[];
+}
+export function weeklyReportData(meetings: Meeting[], startISO: string): WeeklyReportData {
+  const { start, end } = weekRange(startISO);
+  const inWeek = meetings.filter((m) => m.date >= start && m.date <= end).slice().sort((a, b) => a.date.localeCompare(b.date));
+  const topics = new Set<string>();
+  const decisions: string[] = [];
+  const actionItems: string[] = [];
+  const completed: Commitment[] = [];
+  inWeek.forEach((m) => {
+    m.topics.forEach((t) => topics.add(t));
+    decisions.push(...m.decisions);
+    actionItems.push(...m.actionItems);
+    m.commitments.forEach((c) => { if (c.status === "done") completed.push(c); });
+  });
+  const nextWeekEnd = addDaysISO(end, 7);
+  const upcoming = myOpenCommitments(meetings).filter((c) => c.dueDate && c.dueDate > end && c.dueDate <= nextWeekEnd);
+  return { start, end, meetings: inWeek, topics: [...topics], decisions, actionItems, completed, upcoming };
+}
 
 function mentions(m: Meeting, sid: string): boolean {
   return (

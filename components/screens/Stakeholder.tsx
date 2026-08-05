@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ArrowLeft, RefreshCw, Circle, Pencil } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Eyebrow, SectionTitle, SourceQuote, DueLabel, vibrantCard } from "@/components/bits";
+import { Eyebrow, SectionTitle, SourceQuote, DueLabel, vibrantCard, Spinner } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
 import { cn, intel, trajectory, fmtFull, fmtStamp, stakeholderById } from "@/lib/utils";
@@ -71,7 +71,7 @@ export function StakeholderScreen({ id }: { id: string }) {
         <div className="flex items-center justify-between">
           <Eyebrow>Relationship summary</Eyebrow>
           <button onClick={regenerate} className="flex items-center gap-1 text-[11px] font-semibold text-primary disabled:opacity-50" disabled={busy}>
-            <RefreshCw className={`h-3 w-3 ${busy ? "animate-spin" : ""}`} /> {busy ? "Synthesizing…" : "Regenerate"}
+            {busy ? <Spinner className="h-3 w-3" /> : <RefreshCw className="h-3 w-3" />} {busy ? "Synthesizing…" : "Regenerate"}
           </button>
         </div>
         <div className="mt-2 text-[15px] leading-relaxed">{s.summary}</div>

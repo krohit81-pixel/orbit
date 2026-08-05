@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ArrowLeft, CircleDot, CheckCircle2, Pencil, ChevronDown, ChevronUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Eyebrow, SectionTitle, SourceQuote, DueLabel, vibrantCard } from "@/components/bits";
+import { Eyebrow, SectionTitle, SourceQuote, DueLabel, vibrantCard, Spinner } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
 import { cn, fmtFull, stakeholderById, commitmentLabel } from "@/lib/utils";
@@ -13,8 +13,18 @@ export function MeetingScreen({ id }: { id: string }) {
   const { meetings, stakeholders, toggleCommitment } = useOrbit();
   const { go } = useFlow();
   const [showTranscript, setShowTranscript] = useState(false);
+  const [pending, setPending] = useState<Set<string>>(new Set());
   const m = meetings.find((x) => x.id === id);
   if (!m) return <div className="py-10 text-center text-muted-foreground">Meeting not found.</div>;
+
+  const doToggle = async (commId: string) => {
+    setPending((p) => new Set(p).add(commId));
+    try {
+      await toggleCommitment(m.id, commId);
+    } finally {
+      setPending((p) => { const next = new Set(p); next.delete(commId); return next; });
+    }
+  };
 
   return (
     <div>
@@ -63,8 +73,14 @@ export function MeetingScreen({ id }: { id: string }) {
           <SectionTitle>Commitments</SectionTitle>
           {m.commitments.map((cm) => (
             <Card key={cm.id} className={cn(vibrantCard, "mb-2.5")}><CardContent className="flex items-start gap-2.5">
-              <button className="mt-0.5" onClick={() => toggleCommitment(m.id, cm.id)} aria-label="Toggle done">
-                {cm.status === "done" ? <CheckCircle2 className="h-5 w-5 text-[hsl(var(--ring))]" /> : <CircleDot className="h-5 w-5 text-muted-foreground/60" />}
+              <button className="mt-0.5" onClick={() => doToggle(cm.id)} disabled={pending.has(cm.id)} aria-label="Toggle done">
+                {pending.has(cm.id) ? (
+                  <Spinner className="h-5 w-5 text-muted-foreground/60" />
+                ) : cm.status === "done" ? (
+                  <CheckCircle2 className="h-5 w-5 text-[hsl(var(--ring))]" />
+                ) : (
+                  <CircleDot className="h-5 w-5 text-muted-foreground/60" />
+                )}
               </button>
               <div className="flex-1">
                 <div className="mb-1 flex items-center gap-2">

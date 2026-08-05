@@ -42,7 +42,7 @@ export function ReviewScreen() {
         Nothing is saved yet. Drop anything that&apos;s wrong, then commit what&apos;s right to your knowledge base.
       </p>
 
-      <Card className="mb-4 bg-[#FCFBF8]"><CardContent>
+      <Card className="mb-4 bg-accent/40"><CardContent>
         <Eyebrow>Proposed title, date &amp; summary</Eyebrow>
         <Input className="mt-2 font-semibold" value={r.title} onChange={(e) => setReview({ ...r, title: e.target.value })} />
         <Input type="date" className="mt-2 w-auto" value={r.date} onChange={(e) => setReview({ ...r, date: e.target.value })} />

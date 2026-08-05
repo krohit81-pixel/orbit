@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/bits";
 import { useFlow } from "@/components/flow";
 
 export function CaptureScreen() {
@@ -31,7 +32,8 @@ export function CaptureScreen() {
         </div>
       )}
       <Button className="mt-3.5 w-full" disabled={busy || !draft.trim()} onClick={runExtraction}>
-        <Sparkles className="h-[18px] w-[18px]" /> {busy ? "Extracting…" : "Extract intelligence"}
+        {busy ? <Spinner className="text-primary-foreground" /> : <Sparkles className="h-[18px] w-[18px]" />}
+        {busy ? "Extracting…" : "Extract intelligence"}
       </Button>
       {err && (
         <Button variant="secondary" className="mt-2.5 w-full" onClick={loadSample}>

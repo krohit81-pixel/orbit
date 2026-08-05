@@ -74,6 +74,15 @@ export interface Extraction {
   actionItems: string[];
 }
 
+// Generated on demand (not persisted) — consistent with Orbit's "derived, not stored"
+// intelligence model. See lib/utils.weeklyReportData + the "weeklyReport" LLM task.
+export interface WeeklyReport {
+  overview: string;
+  focusAreas: string[];
+  accomplishments: string[];
+  upcoming: string[];
+}
+
 export interface ReviewItem { _id: string; include: boolean; [k: string]: unknown }
 export interface ReviewPerson extends ReviewItem { name: string; role?: string | null; existing: boolean }
 export interface ReviewModel {

@@ -7,6 +7,17 @@ import { bucketDue, fmtFull } from "@/lib/utils";
 // expectations). Deliberately not applied to plain form/edit surfaces.
 export const vibrantCard = "border border-primary/30 bg-card shadow-[0_2px_12px_-2px_rgba(91,95,199,0.25)]";
 
+// A small "in progress" ring — use this anywhere an async action (network/DB call) is
+// underway, so it's always visually obvious that Orbit is working on something.
+export function Spinner({ className }: { className?: string }) {
+  return (
+    <svg className={cn("h-4 w-4 animate-spin", className)} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function DueLabel({ dueDate, due, className }: { dueDate?: string | null; due?: string | null; className?: string }) {
   if (!dueDate && !due) return null;
   const overdue = dueDate ? bucketDue(dueDate) === "overdue" : false;

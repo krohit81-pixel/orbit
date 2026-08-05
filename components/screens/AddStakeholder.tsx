@@ -5,6 +5,7 @@ import { ArrowLeft, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
 import { RELATIONSHIPS, cn } from "@/lib/utils";
@@ -22,8 +23,12 @@ export function AddStakeholderScreen() {
   const save = async () => {
     if (!name.trim() || saving) return;
     setSaving(true);
-    await addStakeholder({ name, title, relationship, reportsTo: reportsTo || null });
-    go({ screen: "people" });
+    try {
+      await addStakeholder({ name, title, relationship, reportsTo: reportsTo || null });
+      go({ screen: "people" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -78,7 +83,8 @@ export function AddStakeholderScreen() {
       </div>
 
       <Button className="mt-2 w-full" disabled={!name.trim() || saving} onClick={save}>
-        <Check className="h-[18px] w-[18px]" /> Add stakeholder
+        {saving ? <Spinner className="text-primary-foreground" /> : <Check className="h-[18px] w-[18px]" />}
+        {saving ? "Adding…" : "Add stakeholder"}
       </Button>
     </div>
   );

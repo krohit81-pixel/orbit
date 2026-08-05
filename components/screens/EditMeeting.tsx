@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { SectionTitle } from "@/components/bits";
+import { SectionTitle, Spinner } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
 import type { Commitment, Concern, Expectation, Meeting } from "@/lib/types";
@@ -18,6 +18,8 @@ export function EditMeetingScreen({ id }: { id: string }) {
   const original = meetings.find((m) => m.id === id);
   const [m, setM] = useState<Meeting | null>(original ?? null);
   const [confirming, setConfirming] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   if (!m) return <div className="py-10 text-center text-muted-foreground">Meeting not found.</div>;
 
@@ -58,12 +60,24 @@ export function EditMeetingScreen({ id }: { id: string }) {
   );
 
   const save = async () => {
-    await saveMeeting(m);
-    go({ screen: "meeting", id });
+    if (saving) return;
+    setSaving(true);
+    try {
+      await saveMeeting(m);
+      go({ screen: "meeting", id });
+    } finally {
+      setSaving(false);
+    }
   };
   const doDelete = async () => {
-    await deleteMeeting(id);
-    go({ screen: "meetings" });
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await deleteMeeting(id);
+      go({ screen: "meetings" });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -148,7 +162,10 @@ export function EditMeetingScreen({ id }: { id: string }) {
         </p>
       </div>
 
-      <Button className="mt-2 w-full" onClick={save}><Check className="h-[18px] w-[18px]" /> Save changes</Button>
+      <Button className="mt-2 w-full" disabled={saving} onClick={save}>
+        {saving ? <Spinner className="text-primary-foreground" /> : <Check className="h-[18px] w-[18px]" />}
+        {saving ? "Saving…" : "Save changes"}
+      </Button>
 
       {!confirming ? (
         <Button variant="secondary" className="mt-2.5 w-full text-warm" onClick={() => setConfirming(true)}>
@@ -160,8 +177,10 @@ export function EditMeetingScreen({ id }: { id: string }) {
             Delete <span className="font-semibold text-foreground">{m.title}</span> and everything extracted from it? This can&apos;t be undone.
           </p>
           <div className="mt-3 flex gap-2">
-            <Button variant="warm" className="flex-1" onClick={doDelete}>Yes, delete</Button>
-            <Button variant="secondary" className="flex-1" onClick={() => setConfirming(false)}>Cancel</Button>
+            <Button variant="warm" className="flex-1" disabled={deleting} onClick={doDelete}>
+              {deleting ? <Spinner /> : null} {deleting ? "Deleting…" : "Yes, delete"}
+            </Button>
+            <Button variant="secondary" className="flex-1" disabled={deleting} onClick={() => setConfirming(false)}>Cancel</Button>
           </div>
         </div>
       )}

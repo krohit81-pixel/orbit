@@ -32,6 +32,37 @@
     --ring: 235 49% 57%;
 
     --radius: 0.5rem;
+    --page-bg: #f0f0f2;
+  }
+
+  .dark {
+    --paper: 240 7% 11%;
+    --background: 240 7% 11%;
+    --foreground: 0 0% 92%;
+
+    --card: 240 6% 16%;
+    --card-foreground: 0 0% 92%;
+
+    --primary: 235 60% 70%;          /* lighter violet for contrast on dark */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 6% 21%;
+    --secondary-foreground: 0 0% 80%;
+
+    --muted: 240 6% 21%;
+    --muted-foreground: 240 5% 65%;
+
+    --accent: 235 28% 23%;           /* dark lavender tint */
+    --accent-foreground: 235 75% 83%;
+
+    --warm: 348 65% 63%;
+    --warm-foreground: 0 0% 100%;
+
+    --border: 240 6% 25%;
+    --input: 240 6% 29%;
+    --ring: 235 60% 70%;
+
+    --page-bg: #101013;
   }
 }
 
@@ -39,7 +70,7 @@
   * { @apply border-border; }
   html, body {
     margin: 0; padding: 0;
-    background: #f0f0f2;
+    background: var(--page-bg);
     font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", sans-serif;
   }
   body { @apply text-foreground; -webkit-font-smoothing: antialiased; }
