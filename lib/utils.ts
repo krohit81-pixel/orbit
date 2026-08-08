@@ -208,6 +208,18 @@ function mentions(m: Meeting, sid: string): boolean {
     m.commitments.some((e) => e.ownerId === sid || e.owedToId === sid)
   );
 }
+// A meeting only counts as a genuine interaction with sid if something is specifically
+// attributed to them there (an expectation, concern, or commitment) — not merely that their
+// name appears in the meeting's `mentioned` list, which also catches third parties who came
+// up in conversation but were never actually part of it (e.g. "Sridhar mentioned that Mohit
+// leads Credit Risk IT" — Mohit is mentioned, but Rohit never interacted with him directly).
+function directHit(m: Meeting, sid: string): boolean {
+  return (
+    m.expectations.some((e) => e.stakeholderId === sid) ||
+    m.concerns.some((c) => c.stakeholderId === sid) ||
+    m.commitments.some((c) => c.ownerId === sid || c.owedToId === sid)
+  );
+}
 
 export interface WithMeeting<T> { item: T; meeting: Meeting }
 export interface Intel {
@@ -216,7 +228,8 @@ export interface Intel {
   cons: { c: Concern; meeting: Meeting }[];
   youOwe: OpenCommitment[];
   owesYou: OpenCommitment[];
-  interactions: Meeting[];
+  interactions: Meeting[]; // genuine interactions only (see directHit) — drives "last interaction" / star rating
+  mentionedIn: Meeting[]; // superset: every meeting that references sid at all, direct or not
 }
 export function intel(meetings: Meeting[], sid: string): Intel {
   const cares = new Set<string>();
@@ -225,10 +238,12 @@ export function intel(meetings: Meeting[], sid: string): Intel {
   const youOwe: OpenCommitment[] = [];
   const owesYou: OpenCommitment[] = [];
   const interactions: Meeting[] = [];
+  const mentionedIn: Meeting[] = [];
   meetings.forEach((m) => {
     if (mentions(m, sid)) {
       m.topics.forEach((t) => cares.add(t));
-      interactions.push(m);
+      mentionedIn.push(m);
+      if (directHit(m, sid)) interactions.push(m);
     }
     m.expectations.forEach((e) => { if (e.stakeholderId === sid && e.status !== "met") exps.push({ e, meeting: m }); });
     m.concerns.forEach((c) => { if (c.stakeholderId === sid) cons.push({ c, meeting: m }); });
@@ -239,7 +254,8 @@ export function intel(meetings: Meeting[], sid: string): Intel {
     });
   });
   interactions.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  return { cares: [...cares], exps, cons, youOwe, owesYou, interactions };
+  mentionedIn.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  return { cares: [...cares], exps, cons, youOwe, owesYou, interactions, mentionedIn };
 }
 
 export interface TrajectoryStep {
@@ -293,8 +309,14 @@ export function trajectory(meetings: Meeting[], sid: string): TrajectoryStep[] {
 //   - completed commitments (either direction)        +1 each, max +2  [momentum]
 //   - met expectations                                +1 each, max +2  [momentum]
 //   - interacted within the last 14 days               flat +1         [momentum]
+//
+// `stars` is null — not a number, not even a low one — when there has been zero direct
+// interaction (it.interactions is empty): someone who only ever came up in *someone else's*
+// meeting has no relationship to score yet, and every input to this formula is derived from
+// attributed items, which by construction can't exist without a direct interaction either.
+// Showing a confident-looking 5-star default there was the actual bug being fixed.
 export interface RelationshipHealth {
-  stars: number; // 1-5
+  stars: number | null; // 1-5, or null = not enough signal (no direct interaction yet)
   overdueCount: number;
   recurringConcernCount: number;
   daysSinceLastInteraction: number | null;
@@ -304,6 +326,12 @@ export interface RelationshipHealth {
 }
 export function relationshipHealth(meetings: Meeting[], sid: string): RelationshipHealth {
   const it = intel(meetings, sid);
+  if (it.interactions.length === 0) {
+    return {
+      stars: null, overdueCount: 0, recurringConcernCount: 0, daysSinceLastInteraction: null,
+      completedCount: 0, metExpectationCount: 0, recentlyEngaged: false,
+    };
+  }
   const steps = trajectory(meetings, sid);
   const overdueCount = [...it.youOwe, ...it.owesYou].filter((c) => isOverdue(c.dueDate)).length;
   const recurringConcernCount = steps.reduce((sum, st) => sum + st.recurringConcerns.length, 0);

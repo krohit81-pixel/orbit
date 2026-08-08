@@ -75,10 +75,19 @@ export function ThemeToggle({ theme, setTheme, className }: { theme: Theme; setT
 }
 
 // Five-star row for the deterministic "Relationship Health" heuristic (v1.7). `filled`
-// (0-5) stars render solid; the rest render as outlines. Purely presentational — the
-// score itself is computed in lib/utils.relationshipHealth from real signals, never an
-// opaque AI-generated number.
-export function Stars({ filled, className }: { filled: number; className?: string }) {
+// (0-5) stars render solid; the rest render as outlines. `null` means "not enough signal
+// yet" (no direct interaction) and renders as a plain N/A label instead of a star row —
+// showing a confident-looking score for someone never actually met would be worse than
+// showing nothing. Purely presentational — the score itself is computed in
+// lib/utils.relationshipHealth from real signals, never an opaque AI-generated number.
+export function Stars({ filled, className }: { filled: number | null; className?: string }) {
+  if (filled === null) {
+    return (
+      <span className={cn("text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/60", className)}>
+        N/A
+      </span>
+    );
+  }
   return (
     <span className={cn("inline-flex items-center gap-0.5", className)} aria-label={`${filled} out of 5`}>
       {Array.from({ length: 5 }, (_, i) => (

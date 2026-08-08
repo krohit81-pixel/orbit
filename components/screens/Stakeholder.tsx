@@ -77,8 +77,13 @@ export function StakeholderScreen({ id }: { id: string }) {
         <div className="mt-2.5 space-y-1.5 text-[13px] leading-relaxed">
           <div>
             <span className="font-semibold text-foreground">Last interaction:</span>{" "}
-            <span className="text-muted-foreground">{it.interactions[0] ? fmtFull(it.interactions[0].date) : "None yet"}</span>
+            <span className="text-muted-foreground">{it.interactions[0] ? fmtFull(it.interactions[0].date) : "No direct interaction yet"}</span>
           </div>
+          {it.interactions.length === 0 && it.mentionedIn.length > 0 && (
+            <div className="text-muted-foreground">
+              Mentioned in {it.mentionedIn.length} meeting{it.mentionedIn.length === 1 ? "" : "s"} you had with someone else — not yet met or spoken with directly.
+            </div>
+          )}
           <div>
             <span className="font-semibold text-foreground">Waiting for:</span>{" "}
             <span className="text-muted-foreground">{waiting ? waiting.text : "Nothing pending"}</span>
@@ -86,7 +91,11 @@ export function StakeholderScreen({ id }: { id: string }) {
         </div>
         {it.cares.length > 0 && (
           <div className="mt-3">
-            <div className="text-[13px] font-semibold text-foreground">Things {s.name} currently cares about</div>
+            <div className="text-[13px] font-semibold text-foreground">
+              {it.interactions.length === 0
+                ? `What's come up about ${s.name} secondhand`
+                : `Things ${s.name} currently cares about`}
+            </div>
             <ul className="mt-1 space-y-1">
               {it.cares.slice(0, 4).map((t, i) => (
                 <li key={i} className="text-[13px] leading-snug text-muted-foreground">• {t}</li>
@@ -105,7 +114,11 @@ export function StakeholderScreen({ id }: { id: string }) {
         </div>
         <div className="mt-2 text-[15px] leading-relaxed">{s.summary}</div>
         <div className="mt-2.5 text-[11px] text-muted-foreground/60">
-          {s.summaryGeneratedAt ? `Synthesized ${fmtStamp(s.summaryGeneratedAt)} · ${it.interactions.length} interaction(s)` : `Based on ${it.interactions.length} interaction(s)`}
+          {it.interactions.length === 0
+            ? "No direct interaction yet — nothing firsthand to synthesize"
+            : s.summaryGeneratedAt
+            ? `Synthesized ${fmtStamp(s.summaryGeneratedAt)} · ${it.interactions.length} interaction(s)`
+            : `Based on ${it.interactions.length} interaction(s)`}
         </div>
       </CardContent></Card>
 
