@@ -4,10 +4,10 @@ import { useState } from "react";
 import { ArrowLeft, RefreshCw, Circle, Pencil } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Eyebrow, SectionTitle, SourceQuote, DueLabel, vibrantCard, Spinner } from "@/components/bits";
+import { Eyebrow, SectionTitle, SourceQuote, DueLabel, Stars, vibrantCard, Spinner } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
-import { cn, intel, trajectory, fmtFull, fmtStamp, stakeholderById } from "@/lib/utils";
+import { cn, intel, trajectory, relationshipHealth, waitingOn, fmtFull, fmtStamp, stakeholderById } from "@/lib/utils";
 
 export function StakeholderScreen({ id }: { id: string }) {
   const { stakeholders, meetings, setSummary } = useOrbit();
@@ -18,6 +18,8 @@ export function StakeholderScreen({ id }: { id: string }) {
   if (!s) return <div className="py-10 text-center text-muted-foreground">Stakeholder not found.</div>;
   const it = intel(meetings, id);
   const steps = trajectory(meetings, id);
+  const health = relationshipHealth(meetings, id);
+  const waiting = waitingOn(meetings, id);
 
   const regenerate = async () => {
     if (busy) return;
@@ -67,7 +69,34 @@ export function StakeholderScreen({ id }: { id: string }) {
         )}
       </div>
 
-      <Card className="mb-4 mt-3 bg-accent/40"><CardContent>
+      <div className={cn(vibrantCard, "mb-4 mt-3 rounded-md px-4 py-3.5")}>
+        <div className="flex items-center justify-between">
+          <Eyebrow>Relationship intelligence</Eyebrow>
+          <Stars filled={health.stars} />
+        </div>
+        <div className="mt-2.5 space-y-1.5 text-[13px] leading-relaxed">
+          <div>
+            <span className="font-semibold text-foreground">Last interaction:</span>{" "}
+            <span className="text-muted-foreground">{it.interactions[0] ? fmtFull(it.interactions[0].date) : "None yet"}</span>
+          </div>
+          <div>
+            <span className="font-semibold text-foreground">Waiting for:</span>{" "}
+            <span className="text-muted-foreground">{waiting ? waiting.text : "Nothing pending"}</span>
+          </div>
+        </div>
+        {it.cares.length > 0 && (
+          <div className="mt-3">
+            <div className="text-[13px] font-semibold text-foreground">Things {s.name} currently cares about</div>
+            <ul className="mt-1 space-y-1">
+              {it.cares.slice(0, 4).map((t, i) => (
+                <li key={i} className="text-[13px] leading-snug text-muted-foreground">• {t}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      <Card className="mb-4 bg-accent/40"><CardContent>
         <div className="flex items-center justify-between">
           <Eyebrow>Relationship summary</Eyebrow>
           <button onClick={regenerate} className="flex items-center gap-1 text-[11px] font-semibold text-primary disabled:opacity-50" disabled={busy}>

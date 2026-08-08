@@ -1,6 +1,7 @@
-import { Quote } from "lucide-react";
+import { Quote, Star, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { bucketDue, fmtFull } from "@/lib/utils";
+import type { Theme } from "@/components/ThemeProvider";
 
 // Shared "vibrant" card treatment — a soft violet border + tinted shadow, used on the
 // sections the owner wants to feel a bit more alive (recent meetings, commitments,
@@ -43,6 +44,51 @@ export function SectionTitle({ children, right }: { children: React.ReactNode; r
       <Eyebrow>{children}</Eyebrow>
       {right}
     </div>
+  );
+}
+
+// Shared light/dark segmented control — used in both the mobile hamburger menu and the
+// desktop sidebar (v1.7) so the two chrome variants can't drift out of sync.
+export function ThemeToggle({ theme, setTheme, className }: { theme: Theme; setTheme: (t: Theme) => void; className?: string }) {
+  return (
+    <div className={cn("flex overflow-hidden rounded-md border border-border", className)}>
+      <button
+        onClick={() => setTheme("light")}
+        className={cn(
+          "flex flex-1 items-center justify-center gap-1.5 py-2 text-[12.5px] font-semibold",
+          theme === "light" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
+        )}
+      >
+        <Sun className="h-3.5 w-3.5" /> Light
+      </button>
+      <button
+        onClick={() => setTheme("dark")}
+        className={cn(
+          "flex flex-1 items-center justify-center gap-1.5 py-2 text-[12.5px] font-semibold",
+          theme === "dark" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
+        )}
+      >
+        <Moon className="h-3.5 w-3.5" /> Dark
+      </button>
+    </div>
+  );
+}
+
+// Five-star row for the deterministic "Relationship Health" heuristic (v1.7). `filled`
+// (0-5) stars render solid; the rest render as outlines. Purely presentational — the
+// score itself is computed in lib/utils.relationshipHealth from real signals, never an
+// opaque AI-generated number.
+export function Stars({ filled, className }: { filled: number; className?: string }) {
+  return (
+    <span className={cn("inline-flex items-center gap-0.5", className)} aria-label={`${filled} out of 5`}>
+      {Array.from({ length: 5 }, (_, i) => (
+        <Star
+          key={i}
+          className={cn("h-3.5 w-3.5", i < filled ? "fill-primary text-primary" : "fill-none text-muted-foreground/30")}
+          strokeWidth={i < filled ? 0 : 1.5}
+        />
+      ))}
+    </span>
   );
 }
 

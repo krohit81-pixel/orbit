@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { Home, Users, FileText, Search, Menu, CalendarRange, Sun, Moon, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Home, Users, FileText, Search, Menu, CalendarRange, X } from "lucide-react";
 import { cn, fmtToday } from "@/lib/utils";
 import { useFlow, type View } from "./flow";
 import { useTheme } from "./ThemeProvider";
+import { ThemeToggle } from "./bits";
 
 const TABS: { key: View["screen"]; label: string; icon: typeof Home }[] = [
   { key: "home", label: "Home", icon: Home },
@@ -13,16 +14,46 @@ const TABS: { key: View["screen"]; label: string; icon: typeof Home }[] = [
   { key: "search", label: "Search", icon: Search },
 ];
 
+// Below this width Orbit stays the phone-frame cockpit it was designed as; at or above it
+// (a resized macOS window, an iPad in portrait or landscape) it switches to a sidebar-nav
+// desktop layout instead of just stretching the same narrow column (v1.7). Chosen to clear
+// iPad mini's 744px portrait viewport while staying well above any iPhone width.
+const DESKTOP_BREAKPOINT = 700;
+
+function useIsDesktop(breakpointPx: number): boolean {
+  // Lazy-init from window: Shell only ever mounts client-side (after the store-ready gate
+  // in Orbit.tsx), well past hydration, so reading window here carries no SSR-mismatch risk.
+  const [isDesktop, setIsDesktop] = useState(() => typeof window !== "undefined" && window.innerWidth >= breakpointPx);
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${breakpointPx}px)`);
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, [breakpointPx]);
+  return isDesktop;
+}
+
+function useActiveTab(): View["screen"] {
+  const { view } = useFlow();
+  return view.screen === "stakeholder" || view.screen === "editStakeholder" || view.screen === "addStakeholder"
+    ? "people"
+    : view.screen === "meeting" || view.screen === "editMeeting" || view.screen === "capture" || view.screen === "review"
+    ? "meetings"
+    : view.screen;
+}
+
 export function Shell({ children }: { children: React.ReactNode }) {
+  const isDesktop = useIsDesktop(DESKTOP_BREAKPOINT);
+  return isDesktop ? <DesktopShell>{children}</DesktopShell> : <MobileShell>{children}</MobileShell>;
+}
+
+// ---- Mobile: the original phone-frame cockpit (unchanged below the breakpoint) ----
+function MobileShell({ children }: { children: React.ReactNode }) {
   const { view, go } = useFlow();
   const { theme, setTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
-  const active: View["screen"] =
-    view.screen === "stakeholder" || view.screen === "editStakeholder" || view.screen === "addStakeholder"
-      ? "people"
-      : view.screen === "meeting" || view.screen === "editMeeting" || view.screen === "capture" || view.screen === "review"
-      ? "meetings"
-      : view.screen;
+  const active = useActiveTab();
 
   return (
     <div className="flex min-h-screen justify-center">
@@ -38,7 +69,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </button>
             <button onClick={() => go({ screen: "home" })} className="flex items-baseline gap-1.5 text-[15px] font-bold tracking-tight">
               Orbit
-              <span className="text-[10.5px] font-medium text-muted-foreground/60">v1.6.0</span>
+              <span className="text-[10.5px] font-medium text-muted-foreground/60">v1.7.0</span>
             </button>
           </div>
           <span className="text-[11px] font-medium text-muted-foreground/70">{fmtToday()}</span>
@@ -60,26 +91,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               </button>
               <div className="border-t border-border px-4 py-3">
                 <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">Display</div>
-                <div className="flex overflow-hidden rounded-md border border-border">
-                  <button
-                    onClick={() => setTheme("light")}
-                    className={cn(
-                      "flex flex-1 items-center justify-center gap-1.5 py-2 text-[12.5px] font-semibold",
-                      theme === "light" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
-                    )}
-                  >
-                    <Sun className="h-3.5 w-3.5" /> Light
-                  </button>
-                  <button
-                    onClick={() => setTheme("dark")}
-                    className={cn(
-                      "flex flex-1 items-center justify-center gap-1.5 py-2 text-[12.5px] font-semibold",
-                      theme === "dark" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
-                    )}
-                  >
-                    <Moon className="h-3.5 w-3.5" /> Dark
-                  </button>
-                </div>
+                <ThemeToggle theme={theme} setTheme={setTheme} />
               </div>
             </div>
           </>
@@ -110,6 +122,72 @@ export function Shell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
+      </div>
+    </div>
+  );
+}
+
+// ---- Desktop: sidebar nav + wider content column (v1.7, macOS/iPadOS) ----
+function DesktopShell({ children }: { children: React.ReactNode }) {
+  const { view, go } = useFlow();
+  const { theme, setTheme } = useTheme();
+  const active = useActiveTab();
+
+  return (
+    <div className="flex min-h-screen bg-paper text-foreground">
+      <aside className="flex w-[220px] shrink-0 flex-col border-r border-border">
+        <button onClick={() => go({ screen: "home" })} className="flex items-baseline gap-1.5 px-5 py-5 text-left text-[17px] font-bold tracking-tight">
+          Orbit
+          <span className="text-[11px] font-medium text-muted-foreground/60">v1.7.0</span>
+        </button>
+
+        <nav className="flex flex-1 flex-col gap-0.5 px-2.5">
+          {TABS.map((t) => {
+            const Icon = t.icon;
+            const on = active === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => go({ screen: t.key } as View)}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-[13.5px] font-semibold",
+                  on ? "bg-accent text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                <Icon className="h-[18px] w-[18px]" strokeWidth={on ? 2.4 : 1.9} />
+                {t.label}
+              </button>
+            );
+          })}
+
+          <div className="my-2 border-t border-border" />
+
+          <button
+            onClick={() => go({ screen: "weeklyReport" })}
+            className={cn(
+              "flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-[13.5px] font-semibold",
+              view.screen === "weeklyReport" ? "bg-accent text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+            )}
+          >
+            <CalendarRange className="h-[18px] w-[18px]" /> Weekly report
+          </button>
+
+          <div className="mt-4 px-1">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">Display</div>
+            <ThemeToggle theme={theme} setTheme={setTheme} />
+          </div>
+        </nav>
+
+        <div className="px-4 pb-4 text-[11px] tracking-wide text-muted-foreground/60">Orbit · Rohit Kohli</div>
+      </aside>
+
+      <div className="flex min-h-screen flex-1 flex-col">
+        <header className="sticky top-0 z-20 flex items-center justify-end border-b border-border bg-paper/90 px-8 py-3 backdrop-blur">
+          <span className="text-[12px] font-medium text-muted-foreground/70">{fmtToday()}</span>
+        </header>
+        <div className="app-scroll flex-1 overflow-y-auto px-8 py-7">
+          <div className="mx-auto max-w-[760px]">{children}</div>
+        </div>
       </div>
     </div>
   );

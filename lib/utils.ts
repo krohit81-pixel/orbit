@@ -275,3 +275,86 @@ export function trajectory(meetings: Meeting[], sid: string): TrajectoryStep[] {
   });
   return steps.reverse();
 }
+
+// ---- relationship intelligence (v1.7) ----
+// Deterministic "Relationship Health" heuristic — a transparent point system built from real
+// signals already computed elsewhere (intel/trajectory) plus a small dedicated scan for
+// follow-through, never an opaque LLM-judged score. Consistent with the "pattern detection
+// over existing extracted data, never false-precision scores" guidance in the engineering
+// reference §7 risk-intelligence note: this surfaces the same kind of signal (recurrence,
+// staleness, unmet commitments — and, as of the momentum pass, resolved ones too) as a
+// small, explainable number rather than a fabricated risk model.
+//
+// Every category is capped at +/-2 stars (a flat +1 for recent engagement is the one
+// exception) so no single signal can dominate the score on its own:
+//   - overdue commitments (either direction)         -1 each, max -2
+//   - recurring concerns                              -1 each, max -2
+//   - staleness since last interaction                -1 past 45 days, -2 past 90
+//   - completed commitments (either direction)        +1 each, max +2  [momentum]
+//   - met expectations                                +1 each, max +2  [momentum]
+//   - interacted within the last 14 days               flat +1         [momentum]
+export interface RelationshipHealth {
+  stars: number; // 1-5
+  overdueCount: number;
+  recurringConcernCount: number;
+  daysSinceLastInteraction: number | null;
+  completedCount: number; // commitments between you and them that closed out
+  metExpectationCount: number; // expectations of them that were actually met
+  recentlyEngaged: boolean; // interacted within the last 14 days
+}
+export function relationshipHealth(meetings: Meeting[], sid: string): RelationshipHealth {
+  const it = intel(meetings, sid);
+  const steps = trajectory(meetings, sid);
+  const overdueCount = [...it.youOwe, ...it.owesYou].filter((c) => isOverdue(c.dueDate)).length;
+  const recurringConcernCount = steps.reduce((sum, st) => sum + st.recurringConcerns.length, 0);
+  const lastDate = it.interactions[0]?.date ?? null;
+  const daysSinceLastInteraction = lastDate
+    ? Math.round((Date.now() - new Date(lastDate + "T00:00:00").getTime()) / 86400000)
+    : null;
+  const recentlyEngaged = daysSinceLastInteraction !== null && daysSinceLastInteraction <= 14;
+
+  // Positive momentum: intel() only surfaces what's still OPEN, so closed-out commitments
+  // and met expectations need their own pass over the raw meetings.
+  let completedCount = 0;
+  let metExpectationCount = 0;
+  meetings.forEach((m) => {
+    m.commitments.forEach((c) => {
+      const withMe = (c.ownerId === SELF && c.owedToId === sid) || (c.ownerId === sid && c.owedToId === SELF);
+      if (withMe && c.status === "done") completedCount++;
+    });
+    m.expectations.forEach((e) => {
+      if (e.stakeholderId === sid && e.status === "met") metExpectationCount++;
+    });
+  });
+
+  let stars = 5;
+  stars -= Math.min(2, overdueCount);
+  stars -= Math.min(2, recurringConcernCount);
+  if (daysSinceLastInteraction !== null) {
+    if (daysSinceLastInteraction > 90) stars -= 2;
+    else if (daysSinceLastInteraction > 45) stars -= 1;
+  }
+  stars += Math.min(2, completedCount);
+  stars += Math.min(2, metExpectationCount);
+  if (recentlyEngaged) stars += 1;
+  stars = Math.max(1, Math.min(5, stars));
+
+  return { stars, overdueCount, recurringConcernCount, daysSinceLastInteraction, completedCount, metExpectationCount, recentlyEngaged };
+}
+
+// The single most pressing thing the user is waiting on this person for: the soonest-due
+// (overdue sorts first) open commitment they owe, falling back to their most recently
+// raised open expectation. Null if nothing's outstanding.
+export interface WaitingOn { text: string; meeting: Meeting; kind: "commitment" | "expectation" }
+export function waitingOn(meetings: Meeting[], sid: string): WaitingOn | null {
+  const it = intel(meetings, sid);
+  if (it.owesYou.length) {
+    const c = it.owesYou.slice().sort((a, b) => (a.dueDate || "9999").localeCompare(b.dueDate || "9999"))[0];
+    return { text: c.text, meeting: c.meeting, kind: "commitment" };
+  }
+  if (it.exps.length) {
+    const { e, meeting } = it.exps.slice().sort((a, b) => (b.meeting.date || "").localeCompare(a.meeting.date || ""))[0];
+    return { text: e.text, meeting, kind: "expectation" };
+  }
+  return null;
+}
