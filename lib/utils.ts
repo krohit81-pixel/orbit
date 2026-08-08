@@ -150,6 +150,56 @@ export function weeklyReportData(meetings: Meeting[], startISO: string): WeeklyR
   return { start, end, meetings: inWeek, topics: [...topics], decisions, actionItems, completed, upcoming };
 }
 
+// ---- today's brief ----
+// Deterministic data assembly for Home's "Today's Brief" section; the LLM (the
+// "todaysBrief" task in app/api/llm/route.ts) only turns this into ranked prose — same
+// "code for facts, model for judgment" split as weeklyReportData/weeklyReport. Today the
+// only source is meetings/transcripts; a future calendar feed (Atlas/Outlook/Teams) would
+// plug in here as additional facts, not change the split.
+export interface BriefConcern { concern: Concern; meeting: Meeting; recurring: boolean }
+export interface TodaysBriefData {
+  commitments: OpenCommitment[]; // open, involving me, most urgent first
+  concerns: BriefConcern[]; // raised within the window, most recent first; recurring flagged
+  expectations: { e: Expectation; meeting: Meeting }[]; // open, from meetings within the window
+  recentMeetings: Meeting[]; // within the window, for narrative context
+}
+const DUE_RANK: Record<DueBucket, number> = { overdue: 0, week: 1, upcoming: 2, undated: 3 };
+export function todaysBriefData(meetings: Meeting[], windowDays = 30): TodaysBriefData {
+  const commitments = openCommitmentsInvolvingMe(meetings)
+    .slice()
+    .sort((a, b) => {
+      const r = DUE_RANK[bucketDue(a.dueDate)] - DUE_RANK[bucketDue(b.dueDate)];
+      return r !== 0 ? r : (a.dueDate || "9999").localeCompare(b.dueDate || "9999");
+    });
+
+  const cutoff = addDaysISO(todayISO(), -windowDays);
+  const recentMeetings = meetings
+    .filter((m) => m.date >= cutoff)
+    .slice()
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+  // Walk chronologically to detect recurrence (same heuristic as trajectory()), but only
+  // surface concerns raised within the window.
+  const asc = meetings.slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const seen: string[] = [];
+  const concerns: BriefConcern[] = [];
+  asc.forEach((m) => {
+    m.concerns.forEach((c) => {
+      const recurring = seen.some((s) => similar(s, c.text));
+      if (m.date >= cutoff) concerns.push({ concern: c, meeting: m, recurring });
+      seen.push(c.text);
+    });
+  });
+  concerns.sort((a, b) => (b.meeting.date || "").localeCompare(a.meeting.date || ""));
+
+  const expectations: { e: Expectation; meeting: Meeting }[] = [];
+  recentMeetings.forEach((m) => {
+    m.expectations.forEach((e) => { if (e.status !== "met") expectations.push({ e, meeting: m }); });
+  });
+
+  return { commitments, concerns, expectations, recentMeetings: recentMeetings.slice(0, 8) };
+}
+
 function mentions(m: Meeting, sid: string): boolean {
   return (
     m.mentioned.includes(sid) ||

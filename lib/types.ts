@@ -83,6 +83,16 @@ export interface WeeklyReport {
   upcoming: string[];
 }
 
+// Generated on demand (not persisted) — Home's "Today's Brief" section. Same derived-not-
+// stored model as WeeklyReport, cached client-side per calendar day (see Home.tsx) rather
+// than in Supabase. See lib/utils.todaysBriefData + the "todaysBrief" LLM task. Today the
+// only inputs are meetings/transcripts; a future calendar integration (Atlas/Outlook/Teams)
+// is meant to feed the same digest, not change this shape.
+export interface TodaysBrief {
+  priorities: string[];
+  risks: string[];
+}
+
 export interface ReviewItem { _id: string; include: boolean; [k: string]: unknown }
 export interface ReviewPerson extends ReviewItem { name: string; role?: string | null; existing: boolean }
 export interface ReviewModel {
