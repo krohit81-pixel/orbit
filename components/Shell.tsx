@@ -38,7 +38,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </button>
             <button onClick={() => go({ screen: "home" })} className="flex items-baseline gap-1.5 text-[15px] font-bold tracking-tight">
               Orbit
-              <span className="text-[10.5px] font-medium text-muted-foreground/60">v1.5.0</span>
+              <span className="text-[10.5px] font-medium text-muted-foreground/60">v1.6.0</span>
             </button>
           </div>
           <span className="text-[11px] font-medium text-muted-foreground/70">{fmtToday()}</span>
