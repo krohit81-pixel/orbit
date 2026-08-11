@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { Commitment, Concern, Expectation, Meeting, Relationship, Stakeholder } from "./types";
+import type { Commitment, CommitmentUpdate, Concern, Expectation, Meeting, Relationship, Stakeholder } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -107,6 +107,12 @@ export function otherParty(c: Commitment): string | null {
   return c.ownerId ?? c.owedToId ?? null;
 }
 export const involvesMe = (c: Commitment) => c.ownerId === SELF || c.owedToId === SELF;
+
+// Newest-first log of progress notes / due-date revisions for a commitment (v1.8). Pure
+// read-side helper — writes go through OrbitStore.addCommitmentUpdate.
+export function commitmentUpdates(c: Commitment): CommitmentUpdate[] {
+  return (c.updates ?? []).slice().sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || "").localeCompare(a.createdAt || ""));
+}
 
 export interface OpenCommitment extends Commitment { meeting: Meeting }
 function collectCommitments(meetings: Meeting[], predicate: (c: Commitment) => boolean): OpenCommitment[] {

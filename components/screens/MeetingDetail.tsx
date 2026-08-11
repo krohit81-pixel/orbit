@@ -5,6 +5,7 @@ import { ArrowLeft, CircleDot, CheckCircle2, Pencil, ChevronDown, ChevronUp } fr
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Eyebrow, SectionTitle, SourceQuote, DueLabel, vibrantCard, Spinner } from "@/components/bits";
+import { CommitmentUpdates } from "@/components/CommitmentUpdates";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
 import { cn, fmtFull, stakeholderById, commitmentLabel } from "@/lib/utils";
@@ -89,6 +90,7 @@ export function MeetingScreen({ id }: { id: string }) {
                 </div>
                 <div className={cm.status === "done" ? "font-semibold text-muted-foreground/60 line-through" : "font-semibold"}>{cm.text}</div>
                 <SourceQuote>{cm.source}</SourceQuote>
+                <CommitmentUpdates meetingId={m.id} commitment={cm} />
               </div>
             </CardContent></Card>
           ))}

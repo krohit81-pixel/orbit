@@ -34,6 +34,10 @@ function check(op: string, error: { message: string } | null) {
   }
 }
 
+// Additive (v1.8): older commitments simply have no `updates`; absent = [] on read, never a
+// destructive backfill.
+const normUpdates = (raw: unknown): Commitment["updates"] => (Array.isArray(raw) ? (raw as Commitment["updates"]) : []);
+
 // Migrate legacy commitments ({owedByMe, stakeholderId}) to directional ({ownerId, owedToId}).
 function normCommitment(raw: Record<string, unknown>): Commitment {
   if ("ownerId" in raw || "owedToId" in raw) {
@@ -45,6 +49,7 @@ function normCommitment(raw: Record<string, unknown>): Commitment {
       dueDate: (raw.dueDate as string | null) ?? null,
       source: raw.source as string | undefined,
       status: (raw.status as "open" | "done") ?? "open",
+      updates: normUpdates(raw.updates),
     };
   }
   const owedByMe = Boolean(raw.owedByMe);
@@ -57,6 +62,7 @@ function normCommitment(raw: Record<string, unknown>): Commitment {
     dueDate: (raw.dueDate as string | null) ?? null,
     source: raw.source as string | undefined,
     status: (raw.status as "open" | "done") ?? "open",
+    updates: normUpdates(raw.updates),
   };
 }
 
