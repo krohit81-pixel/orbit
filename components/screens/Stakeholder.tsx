@@ -5,6 +5,7 @@ import { ArrowLeft, RefreshCw, Circle, Pencil } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Eyebrow, SectionTitle, SourceQuote, DueLabel, Stars, vibrantCard, Spinner } from "@/components/bits";
+import { CommitmentUpdates } from "@/components/CommitmentUpdates";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
 import { cn, intel, trajectory, relationshipHealth, waitingOn, fmtFull, fmtStamp, stakeholderById } from "@/lib/utils";
@@ -191,6 +192,7 @@ export function StakeholderScreen({ id }: { id: string }) {
             <Card key={cm.id} className={cn(vibrantCard, "mb-2.5")}><CardContent>
               <DueLabel dueDate={cm.dueDate} due={cm.due} className="mb-1 block" />
               <div className="font-semibold">{cm.text}</div>
+              <CommitmentUpdates meetingId={cm.meeting.id} commitment={cm} />
             </CardContent></Card>
           ))}
         </div>
@@ -203,6 +205,7 @@ export function StakeholderScreen({ id }: { id: string }) {
             <Card key={cm.id} className={cn(vibrantCard, "mb-2.5")}><CardContent>
               <DueLabel dueDate={cm.dueDate} due={cm.due} className="mb-1 block" />
               <div className="font-semibold">{cm.text}</div>
+              <CommitmentUpdates meetingId={cm.meeting.id} commitment={cm} />
             </CardContent></Card>
           ))}
         </div>

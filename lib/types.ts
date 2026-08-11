@@ -26,6 +26,18 @@ export interface Expectation {
   status: "open" | "met";
 }
 
+// A progress note logged against a commitment after the fact — "what's been done so far",
+// optionally paired with a due-date revision. Additive, append-only audit trail; never
+// rewrites or removes a prior entry (v1.8). See lib/utils.commitmentUpdates.
+export interface CommitmentUpdate {
+  id: string;
+  date: string; // ISO yyyy-mm-dd — the date this update is about (defaults to today, editable)
+  note: string; // free text: steps taken, blockers, progress
+  dueDateBefore?: string | null; // set only when this update also revised the due date
+  dueDateAfter?: string | null;
+  createdAt: string; // ISO timestamp, for stable ordering when same-day updates are logged
+}
+
 // A commitment flows from an owner to a recipient ("me" is the sentinel for the user).
 export interface Commitment {
   id: string;
@@ -36,6 +48,7 @@ export interface Commitment {
   dueDate?: string | null;
   source?: string;
   status: "open" | "done";
+  updates?: CommitmentUpdate[]; // progress/audit log — additive, optional (v1.8)
 }
 
 export interface Concern {

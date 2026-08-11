@@ -56,8 +56,8 @@ function MobileShell({ children }: { children: React.ReactNode }) {
   const active = useActiveTab();
 
   return (
-    <div className="flex min-h-screen justify-center">
-      <div className="relative flex min-h-screen w-full max-w-[430px] flex-col bg-paper text-foreground">
+    <div className="flex h-screen justify-center overflow-hidden">
+      <div className="relative flex h-full w-full max-w-[430px] flex-col bg-paper text-foreground">
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-paper/90 px-[18px] py-2.5 backdrop-blur">
           <div className="flex items-center gap-2">
             <button
@@ -69,7 +69,7 @@ function MobileShell({ children }: { children: React.ReactNode }) {
             </button>
             <button onClick={() => go({ screen: "home" })} className="flex items-baseline gap-1.5 text-[15px] font-bold tracking-tight">
               Orbit
-              <span className="text-[10.5px] font-medium text-muted-foreground/60">v1.7.1</span>
+              <span className="text-[10.5px] font-medium text-muted-foreground/60">v1.8.0</span>
             </button>
           </div>
           <span className="text-[11px] font-medium text-muted-foreground/70">{fmtToday()}</span>
@@ -97,7 +97,7 @@ function MobileShell({ children }: { children: React.ReactNode }) {
           </>
         )}
 
-        <div className="app-scroll flex-1 overflow-y-auto px-[18px] pb-24 pt-4">
+        <div className="app-scroll min-h-0 flex-1 overflow-y-auto px-[18px] pb-24 pt-4">
           {children}
           <div className="mt-10 text-center text-[11px] tracking-wide text-muted-foreground/60">
             Orbit · Rohit Kohli
@@ -134,11 +134,11 @@ function DesktopShell({ children }: { children: React.ReactNode }) {
   const active = useActiveTab();
 
   return (
-    <div className="flex min-h-screen bg-paper text-foreground">
-      <aside className="flex w-[220px] shrink-0 flex-col border-r border-border">
+    <div className="flex h-screen overflow-hidden bg-paper text-foreground">
+      <aside className="flex w-[220px] shrink-0 flex-col overflow-y-auto border-r border-border">
         <button onClick={() => go({ screen: "home" })} className="flex items-baseline gap-1.5 px-5 py-5 text-left text-[17px] font-bold tracking-tight">
           Orbit
-          <span className="text-[11px] font-medium text-muted-foreground/60">v1.7.1</span>
+          <span className="text-[11px] font-medium text-muted-foreground/60">v1.8.0</span>
         </button>
 
         <nav className="flex flex-1 flex-col gap-0.5 px-2.5">
@@ -181,11 +181,11 @@ function DesktopShell({ children }: { children: React.ReactNode }) {
         <div className="px-4 pb-4 text-[11px] tracking-wide text-muted-foreground/60">Orbit · Rohit Kohli</div>
       </aside>
 
-      <div className="flex min-h-screen flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 flex items-center justify-end border-b border-border bg-paper/90 px-8 py-3 backdrop-blur">
           <span className="text-[12px] font-medium text-muted-foreground/70">{fmtToday()}</span>
         </header>
-        <div className="app-scroll flex-1 overflow-y-auto px-8 py-7">
+        <div className="app-scroll min-h-0 flex-1 overflow-y-auto px-8 py-7">
           <div className="mx-auto max-w-[760px]">{children}</div>
         </div>
       </div>

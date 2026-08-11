@@ -21,6 +21,7 @@ interface OrbitContextValue {
   saveMeeting: (m: Meeting) => Promise<void>;
   deleteMeeting: (id: string) => Promise<void>;
   toggleCommitment: (meetingId: string, commId: string) => Promise<void>;
+  addCommitmentUpdate: (meetingId: string, commId: string, input: { note: string; date: string; newDueDate?: string | null }) => Promise<void>;
   setSummary: (sid: string, summary: string) => Promise<void>;
 }
 
@@ -162,6 +163,50 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Append-only progress log for a commitment, with an optional due-date revision recorded
+  // alongside it (v1.8). Follows toggleCommitment's optimistic-then-rollback shape, since
+  // this is a data-integrity write like any other.
+  const addCommitmentUpdate = useCallback(async (
+    meetingId: string,
+    commId: string,
+    input: { note: string; date: string; newDueDate?: string | null }
+  ) => {
+    let prevCommitments: Meeting["commitments"] | null = null;
+    let nextCommitments: Meeting["commitments"] | null = null;
+    setMeetings((prev) => prev.map((m) => {
+      if (m.id !== meetingId) return m;
+      prevCommitments = m.commitments;
+      const commitments = m.commitments.map((cm) => {
+        if (cm.id !== commId) return cm;
+        const revisingDue = input.newDueDate !== undefined && input.newDueDate !== (cm.dueDate ?? null);
+        const entry = {
+          id: uid(),
+          date: input.date,
+          note: input.note,
+          dueDateBefore: revisingDue ? cm.dueDate ?? null : undefined,
+          dueDateAfter: revisingDue ? input.newDueDate ?? null : undefined,
+          createdAt: new Date().toISOString(),
+        };
+        return {
+          ...cm,
+          updates: [...(cm.updates ?? []), entry],
+          dueDate: revisingDue ? input.newDueDate ?? null : cm.dueDate,
+          due: revisingDue ? null : cm.due, // the human due label is now stale once dueDate moves
+        };
+      });
+      nextCommitments = commitments;
+      return { ...m, commitments };
+    }));
+    if (!nextCommitments) return;
+    try {
+      await db.updateMeeting(meetingId, { commitments: nextCommitments });
+    } catch (e) {
+      setMeetings((prev) => prev.map((m) => (m.id === meetingId && prevCommitments ? { ...m, commitments: prevCommitments } : m)));
+      const msg = e instanceof Error ? e.message : "Could not save this update.";
+      if (typeof window !== "undefined") window.alert(`Couldn't save: ${msg}\nYour update was not saved — please try again.`);
+    }
+  }, []);
+
   const setSummary = useCallback(async (sid: string, summary: string) => {
     const stamp = new Date().toISOString();
     setStakeholders((prev) => prev.map((s) => (s.id === sid ? { ...s, summary, summaryGeneratedAt: stamp } : s)));
@@ -171,7 +216,7 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
   const value: OrbitContextValue = {
     ready, configured: supabaseConfigured, error, self: { name: "Rohit" },
     stakeholders, meetings, refresh, addStakeholder, saveStakeholder, deleteStakeholder,
-    commitMeeting, saveMeeting, deleteMeeting, toggleCommitment, setSummary,
+    commitMeeting, saveMeeting, deleteMeeting, toggleCommitment, addCommitmentUpdate, setSummary,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
