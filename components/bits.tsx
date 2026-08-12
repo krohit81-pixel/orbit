@@ -19,10 +19,13 @@ export function Spinner({ className }: { className?: string }) {
   );
 }
 
-export function DueLabel({ dueDate, due, className }: { dueDate?: string | null; due?: string | null; className?: string }) {
+// `done` matters here: a completed item is never "overdue" — that's a live-risk word for
+// something still outstanding. Bug fixed in v1.8.1: this previously ignored status entirely,
+// so a closed commitment past its original due date still showed a red "Overdue" badge.
+export function DueLabel({ dueDate, due, done, className }: { dueDate?: string | null; due?: string | null; done?: boolean; className?: string }) {
   if (!dueDate && !due) return null;
-  const overdue = dueDate ? bucketDue(dueDate) === "overdue" : false;
-  const text = dueDate ? (overdue ? `Overdue · ${fmtFull(dueDate)}` : `Due ${fmtFull(dueDate)}`) : due;
+  const overdue = !done && dueDate ? bucketDue(dueDate) === "overdue" : false;
+  const text = dueDate ? (done ? `Was due ${fmtFull(dueDate)}` : overdue ? `Overdue · ${fmtFull(dueDate)}` : `Due ${fmtFull(dueDate)}`) : due;
   return (
     <span className={cn("text-[12px] font-medium", overdue ? "text-warm" : "text-muted-foreground/70", className)}>
       {text}

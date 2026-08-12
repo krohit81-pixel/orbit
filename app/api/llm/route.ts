@@ -101,9 +101,9 @@ Keep every bullet under 18 words and specific to the digest, not generic. If the
       const digest = String(body.digest || "");
       const system = `You are Orbit's daily briefing assistant for Rohit, an executive. Based on the digest below (his open commitments involving him, concerns raised recently — marked if recurring — open expectations, and recent meetings), produce a short "Today's Brief".
 Respond with ONLY valid JSON (no markdown, no commentary) in exactly this shape:
-{"priorities":["short, specific, actionable bullet phrases — the 3-5 things Rohit should prioritise today, ranked most important first"],"risks":["short bullet phrases — potential risks or concerns worth watching, prioritising anything recurring or long unresolved"]}
-Keep every bullet under 18 words. Ground every bullet in the digest — never invent facts or names not present in it. If a section has nothing to report, return an empty array for it rather than inventing content.`;
-      const raw = await callClaude(system, digest, 900);
+{"priorities":["short, specific, actionable bullet phrases — the 3-5 things Rohit should prioritise today, ranked most important first"]}
+Keep every bullet under 18 words. Ground every bullet in the digest — never invent facts or names not present in it. Weigh recurring or long-unresolved concerns into what you prioritise, but the concerns themselves are shown separately and don't need restating. If there's nothing to prioritise, return an empty array rather than inventing content.`;
+      const raw = await callClaude(system, digest, 500);
       let parsed;
       try {
         parsed = JSON.parse(stripFences(raw));
