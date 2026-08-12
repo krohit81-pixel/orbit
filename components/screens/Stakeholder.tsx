@@ -190,7 +190,7 @@ export function StakeholderScreen({ id }: { id: string }) {
           <SectionTitle>What they owe you</SectionTitle>
           {it.owesYou.map((cm) => (
             <Card key={cm.id} className={cn(vibrantCard, "mb-2.5")}><CardContent>
-              <DueLabel dueDate={cm.dueDate} due={cm.due} className="mb-1 block" />
+              <DueLabel dueDate={cm.dueDate} due={cm.due} done={cm.status === "done"} className="mb-1 block" />
               <div className="font-semibold">{cm.text}</div>
               <CommitmentUpdates meetingId={cm.meeting.id} commitment={cm} />
             </CardContent></Card>
@@ -203,7 +203,7 @@ export function StakeholderScreen({ id }: { id: string }) {
           <SectionTitle>What you owe them</SectionTitle>
           {it.youOwe.map((cm) => (
             <Card key={cm.id} className={cn(vibrantCard, "mb-2.5")}><CardContent>
-              <DueLabel dueDate={cm.dueDate} due={cm.due} className="mb-1 block" />
+              <DueLabel dueDate={cm.dueDate} due={cm.due} done={cm.status === "done"} className="mb-1 block" />
               <div className="font-semibold">{cm.text}</div>
               <CommitmentUpdates meetingId={cm.meeting.id} commitment={cm} />
             </CardContent></Card>

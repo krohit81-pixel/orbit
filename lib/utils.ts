@@ -165,7 +165,7 @@ export function weeklyReportData(meetings: Meeting[], startISO: string): WeeklyR
 export interface BriefConcern { concern: Concern; meeting: Meeting; recurring: boolean }
 export interface TodaysBriefData {
   commitments: OpenCommitment[]; // open, involving me, most urgent first
-  concerns: BriefConcern[]; // raised within the window, most recent first; recurring flagged
+  concerns: BriefConcern[]; // raised within the window, recurring first then most recent
   expectations: { e: Expectation; meeting: Meeting }[]; // open, from meetings within the window
   recentMeetings: Meeting[]; // within the window, for narrative context
 }
@@ -196,7 +196,11 @@ export function todaysBriefData(meetings: Meeting[], windowDays = 30): TodaysBri
       seen.push(c.text);
     });
   });
-  concerns.sort((a, b) => (b.meeting.date || "").localeCompare(a.meeting.date || ""));
+  // Recurring concerns first (the more persistent signal), then most recent within each group.
+  concerns.sort((a, b) => {
+    if (a.recurring !== b.recurring) return a.recurring ? -1 : 1;
+    return (b.meeting.date || "").localeCompare(a.meeting.date || "");
+  });
 
   const expectations: { e: Expectation; meeting: Meeting }[] = [];
   recentMeetings.forEach((m) => {

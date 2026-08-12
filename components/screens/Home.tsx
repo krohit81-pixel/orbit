@@ -179,7 +179,7 @@ export function HomeScreen() {
                       <div className="text-[13.5px] font-medium leading-snug">{cm.text}</div>
                       <div className="mt-0.5 flex items-center gap-2">
                         <span className="text-[11.5px] font-semibold text-primary">{commitmentLabel(cm, stakeholders)}</span>
-                        <DueLabel dueDate={cm.dueDate} due={cm.due} />
+                        <DueLabel dueDate={cm.dueDate} due={cm.due} done={cm.status === "done"} />
                       </div>
                     </div>
                   ))}
@@ -189,15 +189,23 @@ export function HomeScreen() {
               <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                 <AlertTriangle className="h-3 w-3" /> Potential risks &amp; concerns
               </div>
-              {brief.risks.length === 0 ? (
+              {briefData.concerns.length === 0 ? (
                 <div className="text-[13px] text-muted-foreground">Nothing flagged right now.</div>
               ) : (
-                <div className="rounded-md border border-primary/20 bg-card px-3 py-2.5">
-                  <ul className="space-y-1.5">
-                    {brief.risks.map((r, i) => (
-                      <li key={i} className="text-[13.5px] leading-snug">• {r}</li>
-                    ))}
-                  </ul>
+                <div className="space-y-1.5">
+                  {briefData.concerns.slice(0, 5).map(({ concern, meeting, recurring }) => (
+                    <div
+                      key={concern.id}
+                      onClick={() => go({ screen: "meeting", id: meeting.id })}
+                      className="cursor-pointer rounded-md border border-primary/20 bg-card px-2.5 py-2"
+                    >
+                      <div className="text-[13.5px] font-medium leading-snug">{concern.text}</div>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        {recurring && <span className="text-[11.5px] font-semibold text-warm">Raised again</span>}
+                        <span className="text-[11px] text-muted-foreground/70">{meeting.title} · {fmtFull(meeting.date)}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -264,7 +272,7 @@ export function HomeScreen() {
                         <div className="text-[14px] font-medium">{cm.text}</div>
                         <div className="mt-0.5 flex items-center gap-2">
                           <span className="text-[11.5px] font-semibold text-primary">{commitmentLabel(cm, stakeholders)}</span>
-                          <DueLabel dueDate={cm.dueDate} due={cm.due} />
+                          <DueLabel dueDate={cm.dueDate} due={cm.due} done={cm.status === "done"} />
                         </div>
                       </div>
                     ))}

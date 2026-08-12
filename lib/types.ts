@@ -101,9 +101,12 @@ export interface WeeklyReport {
 // than in Supabase. See lib/utils.todaysBriefData + the "todaysBrief" LLM task. Today the
 // only inputs are meetings/transcripts; a future calendar integration (Atlas/Outlook/Teams)
 // is meant to feed the same digest, not change this shape.
+// v1.8.1: "risks" dropped — Potential risks & concerns is now rendered directly from
+// todaysBriefData().concerns (real, clickable, sourced items), not LLM prose, so the user
+// can click through to the meeting a concern was raised in and judge for themselves whether
+// it's resolved. Only "priorities" still needs the model's judgment.
 export interface TodaysBrief {
   priorities: string[];
-  risks: string[];
 }
 
 export interface ReviewItem { _id: string; include: boolean; [k: string]: unknown }

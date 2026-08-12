@@ -86,7 +86,7 @@ export function MeetingScreen({ id }: { id: string }) {
               <div className="flex-1">
                 <div className="mb-1 flex items-center gap-2">
                   <span className="text-[11.5px] font-semibold text-primary">{commitmentLabel(cm, stakeholders)}</span>
-                  <DueLabel dueDate={cm.dueDate} due={cm.due} />
+                  <DueLabel dueDate={cm.dueDate} due={cm.due} done={cm.status === "done"} />
                 </div>
                 <div className={cm.status === "done" ? "font-semibold text-muted-foreground/60 line-through" : "font-semibold"}>{cm.text}</div>
                 <SourceQuote>{cm.source}</SourceQuote>
