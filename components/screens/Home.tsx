@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
 import {
-  fmtFull, intel, isOverdue, openCommitmentsInvolvingMe, otherParty, commitmentLabel,
+  fmtFull, fmtStamp, intel, isOverdue, openCommitmentsInvolvingMe, otherParty, commitmentLabel,
   stakeholderById, todaysBriefData, todayISO, type OpenCommitment,
 } from "@/lib/utils";
 import type { TodaysBrief } from "@/lib/types";
@@ -44,10 +44,13 @@ export function HomeScreen() {
     .slice(0, 3);
 
   // ---- Today's Brief ----
-  // Auto-generates once per calendar day (cached in localStorage) so navigating back to
-  // Home doesn't re-fire the LLM; a manual refresh regenerates on demand. Nothing here is
-  // persisted to Supabase — same derived-not-stored model as the weekly report.
+  // Fully manual (v1.9) — never auto-fires, on mount or otherwise. Shows whatever was last
+  // generated (cached in localStorage, no matter how old) until the owner explicitly taps
+  // regenerate; a "Generated <stamp>" caption makes staleness visible rather than silently
+  // assumed-fresh. Nothing here is persisted to Supabase — same derived-not-stored model as
+  // the weekly report.
   const [brief, setBrief] = useState<TodaysBrief | null>(null);
+  const [briefGeneratedAt, setBriefGeneratedAt] = useState<string | null>(null);
   const [briefBusy, setBriefBusy] = useState(false);
   const [briefErr, setBriefErr] = useState("");
   const briefData = todaysBriefData(meetings);
@@ -90,9 +93,11 @@ export function HomeScreen() {
       const json = await res.json();
       if (!res.ok || !json.brief) throw new Error(json.error || "Couldn't generate today's brief.");
       const b = json.brief as TodaysBrief;
+      const stamp = new Date().toISOString();
       setBrief(b);
+      setBriefGeneratedAt(stamp);
       try {
-        localStorage.setItem(BRIEF_CACHE_KEY, JSON.stringify({ date: todayISO(), brief: b }));
+        localStorage.setItem(BRIEF_CACHE_KEY, JSON.stringify({ generatedAt: stamp, brief: b }));
       } catch {
         // localStorage unavailable — brief still shows for this session, just won't be cached.
       }
@@ -103,22 +108,20 @@ export function HomeScreen() {
     }
   };
 
+  // Load whatever was last generated, however old — no auto-fire, ever (v1.9).
   useEffect(() => {
-    if (meetings.length === 0) return; // nothing to brief about yet
     try {
       const raw = localStorage.getItem(BRIEF_CACHE_KEY);
       if (raw) {
-        const cached = JSON.parse(raw) as { date: string; brief: TodaysBrief };
-        if (cached.date === todayISO() && cached.brief) {
+        const cached = JSON.parse(raw) as { generatedAt?: string; brief: TodaysBrief };
+        if (cached.brief) {
           setBrief(cached.brief);
-          return;
+          setBriefGeneratedAt(cached.generatedAt ?? null);
         }
       }
     } catch {
-      // ignore a corrupt/unavailable cache and just regenerate
+      // ignore a corrupt/unavailable cache — falls through to the empty "generate" state
     }
-    generateBrief();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -129,21 +132,40 @@ export function HomeScreen() {
       {meetings.length > 0 && (
         <div className={cn(vibrantCard, "mb-[18px] rounded-md bg-accent/40")}>
           <div className="flex items-center justify-between px-3.5 pt-3">
-            <span className="text-[13px] font-bold tracking-tight text-foreground">Today&apos;s Brief</span>
-            <button
-              onClick={generateBrief}
-              disabled={briefBusy}
-              aria-label="Refresh today's brief"
-              className="rounded-md p-1 text-muted-foreground/70 hover:bg-secondary hover:text-foreground disabled:opacity-50"
-            >
-              {briefBusy ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
-            </button>
+            <div>
+              <span className="text-[13px] font-bold tracking-tight text-foreground">Today&apos;s Brief</span>
+              {brief && briefGeneratedAt && (
+                <div className="text-[10.5px] text-muted-foreground/60">Generated {fmtStamp(briefGeneratedAt)}</div>
+              )}
+            </div>
+            {brief && (
+              <button
+                onClick={generateBrief}
+                disabled={briefBusy}
+                aria-label="Regenerate today's brief"
+                className="rounded-md p-1 text-muted-foreground/70 hover:bg-secondary hover:text-foreground disabled:opacity-50"
+              >
+                {briefBusy ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              </button>
+            )}
           </div>
 
           {briefErr && <div className="px-3.5 pb-3 pt-2 text-[13px] text-warm">{briefErr}</div>}
 
-          {!brief && !briefBusy && !briefErr && (
-            <div className="px-3.5 pb-3 pt-2 text-[13px] text-muted-foreground">Preparing your brief…</div>
+          {!brief && !briefErr && (
+            <div className="px-3.5 pb-3.5 pt-2.5">
+              <p className="mb-2.5 text-[13px] leading-relaxed text-muted-foreground">
+                Suggested priorities, open commitments, and potential risks — generated on demand from your logged meetings.
+              </p>
+              <button
+                onClick={generateBrief}
+                disabled={briefBusy}
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-3.5 py-2.5 text-[13.5px] font-semibold text-primary-foreground disabled:opacity-60"
+              >
+                {briefBusy ? <Spinner className="text-primary-foreground" /> : <Sparkles className="h-[16px] w-[16px]" />}
+                {briefBusy ? "Generating…" : "Generate brief"}
+              </button>
+            </div>
           )}
 
           {brief && (
