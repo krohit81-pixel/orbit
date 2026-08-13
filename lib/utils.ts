@@ -75,11 +75,37 @@ export function matchesQuery(query: string, text?: string): boolean {
   const hay = norm(text);
   return toks.every((t) => hay.includes(t));
 }
+// Common function words that are >3 characters (so the old length-only filter let them
+// through) but carry no topical meaning — "with", "which", "than", "into" — the exact words
+// that were making unrelated concerns look "similar" in a text-heavy corpus. Excluding these
+// was necessary once real data showed matches like shared words [which, with, reporting].
+const STOPWORDS = new Set([
+  "this", "that", "than", "with", "into", "which", "will", "from", "have", "been", "were",
+  "they", "their", "them", "some", "such", "only", "also", "more", "most", "both", "each",
+  "when", "where", "while", "about", "after", "before", "during", "under", "over", "against",
+  "between", "through", "without", "within", "upon", "until", "unless", "because", "although",
+  "however", "therefore", "since", "given", "rather", "other", "another", "these", "those",
+  "what", "whom", "whose", "being", "doing", "having", "would", "could", "should", "might",
+  "must", "shall", "cannot", "does", "done", "very", "just", "then", "there", "here", "still",
+  "yet", "even", "much", "many", "less", "least", "every", "either", "neither", "across",
+  "around", "among",
+]);
+function contentWords(s: string): Set<string> {
+  return new Set(norm(s).split(" ").filter((w) => w.length > 3 && !STOPWORDS.has(w)));
+}
+// v1.9.1 fixes, both found by testing against real data rather than synthetic cases:
+// (1) both sides are now deduplicated distinct-word sets — previously `tb` was a raw,
+//     non-deduped array, so a word repeated twice within one text counted as two separate
+//     pieces of "shared vocabulary" evidence, clearing the threshold with no real overlap
+//     behind it; (2) stopwords are excluded (see STOPWORDS above) and the main threshold
+//     raised 2->3 shared *content* words — in a corpus this concentrated on one ongoing
+//     initiative, two matching words are almost always just "risk" and "Pune" showing up
+//     everywhere, not two concerns actually restating the same thing.
 function similar(a: string, b: string): boolean {
-  const ta = new Set(norm(a).split(" ").filter((w) => w.length > 3));
-  const tb = norm(b).split(" ").filter((w) => w.length > 3);
-  const shared = tb.filter((w) => ta.has(w)).length;
-  return shared >= 2 || (shared >= 1 && tb.length <= 3);
+  const ta = contentWords(a);
+  const tb = contentWords(b);
+  const shared = [...tb].filter((w) => ta.has(w)).length;
+  return shared >= 3 || (shared >= 1 && tb.size <= 3);
 }
 
 // ---- selectors ----
@@ -186,15 +212,25 @@ export function todaysBriefData(meetings: Meeting[], windowDays = 30): TodaysBri
 
   // Walk chronologically to detect recurrence (same heuristic as trajectory()), but only
   // surface concerns raised within the window.
+  //
+  // v1.9.1 fix: a meeting's own concerns are checked against `seen` BEFORE any of that same
+  // meeting's concerns are added to it — never against each other. The previous version
+  // pushed each concern into `seen` immediately after checking it, so the 2nd, 3rd, ... nth
+  // concern in one meeting was being compared against the 1st, 2nd, ... concern from that
+  // *same* meeting and could get flagged "raised again" on its very first-ever mention,
+  // purely because two unrelated concerns from one meeting happened to share a couple of
+  // words (e.g. both mentioning "Pune").
   const asc = meetings.slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const seen: string[] = [];
   const concerns: BriefConcern[] = [];
   asc.forEach((m) => {
+    const thisMeetingsTexts: string[] = [];
     m.concerns.forEach((c) => {
       const recurring = seen.some((s) => similar(s, c.text));
       if (m.date >= cutoff) concerns.push({ concern: c, meeting: m, recurring });
-      seen.push(c.text);
+      thisMeetingsTexts.push(c.text);
     });
+    seen.push(...thisMeetingsTexts);
   });
   // Recurring concerns first (the more persistent signal), then most recent within each group.
   concerns.sort((a, b) => {
@@ -288,13 +324,18 @@ export function trajectory(meetings: Meeting[], sid: string): TrajectoryStep[] {
     const con = m.concerns.filter((e) => e.stakeholderId === sid);
     const youCommitted = m.commitments.filter((c) => c.ownerId === SELF && c.owedToId === sid);
     const theyCommitted = m.commitments.filter((c) => c.ownerId === sid);
+    // v1.9.1 fix: checked against concerns seen in EARLIER meetings only — concerns raised
+    // together in this same meeting no longer get compared against each other (see the
+    // matching fix + longer explanation in todaysBriefData above).
     const freshConcerns: Concern[] = [];
     const recurringConcerns: Concern[] = [];
+    const thisStepsTexts: string[] = [];
     con.forEach((cn) => {
-      const prior = seenConcerns.find((s) => similar(s, cn.text));
+      const prior = seenConcerns.some((s) => similar(s, cn.text));
       (prior ? recurringConcerns : freshConcerns).push(cn);
-      seenConcerns.push(cn.text);
+      thisStepsTexts.push(cn.text);
     });
+    seenConcerns.push(...thisStepsTexts);
     const newTopics = m.topics.filter((t) => !seenTopics.has(t));
     m.topics.forEach((t) => seenTopics.add(t));
     return { meeting: m, first: i === 0, expectations, freshConcerns, recurringConcerns, youCommitted, theyCommitted, newTopics };
