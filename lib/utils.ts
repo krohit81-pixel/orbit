@@ -396,3 +396,28 @@ export function waitingOn(meetings: Meeting[], sid: string): WaitingOn | null {
   }
   return null;
 }
+
+// ---- ask assistant (v1.9) ----
+// Deterministic digest of EVERY meeting's structured extraction (unlike weeklyReportData/
+// todaysBriefData, this isn't time-windowed — a "last meeting with X" question needs the
+// full history) — the LLM only answers from this, never invents facts. Each meeting is
+// tagged with its real id so the model can cite sources the UI can re-resolve and link back
+// to (see AssistantSource in lib/types). Same "in-memory everything" scale limit as the rest
+// of the app (engineering reference §11) — fine at current volume; would need pagination or
+// summarization before this gets unwieldy at very large meeting counts.
+export function assistantDigest(meetings: Meeting[], stakeholders: Stakeholder[]): string {
+  const sorted = meetings.slice().sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const lines: string[] = [];
+  sorted.forEach((m) => {
+    lines.push(`[${m.id}] ${fmtFull(m.date)} — ${m.title}`);
+    if (m.summary) lines.push(`Summary: ${m.summary}`);
+    if (m.topics.length) lines.push(`Topics: ${m.topics.join(", ")}`);
+    m.expectations.forEach((e) => lines.push(`Expectation (${partyName(stakeholders, e.stakeholderId)}, ${e.status}): ${e.text}`));
+    m.commitments.forEach((c) => lines.push(`Commitment (${commitmentLabel(c, stakeholders)}, ${c.status}${c.dueDate ? `, due ${fmtFull(c.dueDate)}` : ""}): ${c.text}`));
+    m.concerns.forEach((c) => lines.push(`Concern (${partyName(stakeholders, c.stakeholderId)}): ${c.text}`));
+    if (m.decisions.length) lines.push(`Decisions: ${m.decisions.join("; ")}`);
+    if (m.actionItems.length) lines.push(`Action items: ${m.actionItems.join("; ")}`);
+    lines.push("");
+  });
+  return lines.join("\n");
+}

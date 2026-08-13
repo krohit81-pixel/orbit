@@ -109,6 +109,15 @@ export interface TodaysBrief {
   priorities: string[];
 }
 
+// Generated on demand (not persisted) — Search's "Ask Orbit" natural-language Q&A (v1.9).
+// The LLM only cites which meetings it drew from (meetingId/title/date); the UI re-resolves
+// each source against the real `meetings` array rather than trusting the model's title/date
+// text, and silently drops anything that doesn't resolve — so a source link is either real
+// or absent, never a plausible-looking hallucination. See lib/utils.assistantDigest + the
+// "ask" LLM task.
+export interface AssistantSource { meetingId: string; title: string; date: string }
+export interface AssistantAnswer { answer: string; sources: AssistantSource[] }
+
 export interface ReviewItem { _id: string; include: boolean; [k: string]: unknown }
 export interface ReviewPerson extends ReviewItem { name: string; role?: string | null; existing: boolean }
 export interface ReviewModel {

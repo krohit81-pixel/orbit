@@ -113,6 +113,25 @@ Keep every bullet under 18 words. Ground every bullet in the digest — never in
       return NextResponse.json({ brief: parsed });
     }
 
+    if (task === "ask") {
+      const question = String(body.question || "");
+      const context = String(body.context || "");
+      const system = `You are Orbit's research assistant for Rohit, an executive. Answer the question using ONLY the meeting digest below — never invent facts, names, dates, or quotes that aren't in it. Each meeting in the digest starts with its id in square brackets, e.g. "[abc123] 12 Aug 2026 — Meeting Title".
+Be concise and specific: prefer exact names, dates, and commitment/expectation text over vague paraphrase. If the user asks to see a transcript or "the discussion", point them at the right meeting rather than trying to reproduce transcript text.
+Respond with ONLY valid JSON (no markdown, no commentary) in exactly this shape:
+{"answer":"plain-text answer, 1-4 sentences unless the question needs a short list","sources":[{"meetingId":"the [id] from the digest","title":"meeting title","date":"YYYY-MM-DD"}]}
+List every meeting your answer draws from in "sources", most relevant first, capped at 5. If the digest has nothing relevant to the question, say so plainly in "answer" and return an empty "sources" array — never guess.`;
+      const user = `Meeting digest:\n${context}\n\nQuestion: ${question}`;
+      const raw = await callClaude(system, user, 700);
+      let parsed;
+      try {
+        parsed = JSON.parse(stripFences(raw));
+      } catch {
+        throw new Error("The answer wasn't valid JSON. Please try asking again.");
+      }
+      return NextResponse.json({ result: parsed });
+    }
+
     return NextResponse.json({ error: "Unknown task." }, { status: 400 });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Extraction failed.";
