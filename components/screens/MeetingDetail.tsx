@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, CircleDot, CheckCircle2, Pencil, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, CircleDot, CheckCircle2, Pencil, Printer, ChevronDown, ChevronUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Eyebrow, SectionTitle, SourceQuote, DueLabel, vibrantCard, Spinner } from "@/components/bits";
@@ -31,9 +31,14 @@ export function MeetingScreen({ id }: { id: string }) {
     <div>
       <div className="flex items-center justify-between py-2">
         <button onClick={() => go({ screen: "meetings" })}><ArrowLeft className="h-5 w-5" /></button>
-        <button onClick={() => go({ screen: "editMeeting", id })} className="flex items-center gap-1 text-[13px] font-semibold text-primary">
-          <Pencil className="h-3.5 w-3.5" /> Edit
-        </button>
+        <div className="flex items-center gap-4">
+          <button onClick={() => go({ screen: "meetingPrint", id })} className="flex items-center gap-1 text-[13px] font-semibold text-primary">
+            <Printer className="h-3.5 w-3.5" /> Export
+          </button>
+          <button onClick={() => go({ screen: "editMeeting", id })} className="flex items-center gap-1 text-[13px] font-semibold text-primary">
+            <Pencil className="h-3.5 w-3.5" /> Edit
+          </button>
+        </div>
       </div>
       <div className="text-2xl font-bold tracking-tight">{m.title}</div>
       <div className="mb-3.5 mt-0.5 text-[13px] text-muted-foreground/70">{fmtFull(m.date)}</div>
