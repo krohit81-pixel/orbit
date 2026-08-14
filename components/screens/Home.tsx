@@ -20,16 +20,19 @@ export function HomeScreen() {
   const { go } = useFlow();
   const open = openCommitmentsInvolvingMe(meetings);
 
-  // group by the other party
+  // group by the other party — every item here already involves the user (openCommitmentsInvolvingMe),
+  // so when otherParty() can't name a counterparty (e.g. "You owe" with no one specified), the
+  // commitment is still clearly yours — bucket it under "You", not a vague "Unassigned".
+  const SELF_KEY = "__self";
   const groups = new Map<string, OpenCommitment[]>();
   open.forEach((cm) => {
-    const key = otherParty(cm) ?? "__unassigned";
+    const key = otherParty(cm) ?? SELF_KEY;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(cm);
   });
   const groupList = [...groups.entries()].sort((a, b) => {
-    if (a[0] === "__unassigned") return 1;
-    if (b[0] === "__unassigned") return -1;
+    if (a[0] === SELF_KEY) return 1;
+    if (b[0] === SELF_KEY) return -1;
     return (stakeholderById(stakeholders, a[0])?.name ?? "").localeCompare(stakeholderById(stakeholders, b[0])?.name ?? "");
   });
   groupList.forEach(([, items]) => items.sort((x, y) => (x.dueDate || "9999").localeCompare(y.dueDate || "9999")));
@@ -134,8 +137,10 @@ export function HomeScreen() {
           <div className="flex items-center justify-between px-3.5 pt-3">
             <div>
               <span className="text-[13px] font-bold tracking-tight text-foreground">Today&apos;s Brief</span>
-              {brief && briefGeneratedAt && (
-                <div className="text-[10.5px] text-muted-foreground/60">Generated {fmtStamp(briefGeneratedAt)}</div>
+              {brief && (
+                <div className="text-[10.5px] text-muted-foreground/60">
+                  {briefGeneratedAt ? `Generated ${fmtStamp(briefGeneratedAt)}` : "Generated earlier — tap ↻ to refresh"}
+                </div>
               )}
             </div>
             {brief && (
@@ -269,7 +274,7 @@ export function HomeScreen() {
             <Card className="mb-2.5"><CardContent className="text-muted-foreground/70">Nothing outstanding. Clean slate.</CardContent></Card>
           )}
           {groupList.map(([key, items]) => {
-            const person = key === "__unassigned" ? null : stakeholderById(stakeholders, key);
+            const person = key === SELF_KEY ? null : stakeholderById(stakeholders, key);
             const openState = isOpen(key);
             return (
               <div key={key} className={cn(vibrantCard, "mb-2.5 overflow-hidden rounded-md")}>
@@ -278,7 +283,7 @@ export function HomeScreen() {
                   onClick={() => toggle(key)}
                 >
                   <span className="flex items-center gap-2">
-                    <span className="text-[13px] font-bold tracking-tight text-foreground">{person ? person.name : "Unassigned"}</span>
+                    <span className="text-[13px] font-bold tracking-tight text-foreground">{person ? person.name : "You"}</span>
                     <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">{items.length}</span>
                   </span>
                   {openState ? <ChevronDown className="h-4 w-4 text-muted-foreground/60" /> : <ChevronRight className="h-4 w-4 text-muted-foreground/60" />}

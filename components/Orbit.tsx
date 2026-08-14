@@ -12,6 +12,7 @@ import { EditStakeholderScreen } from "./screens/EditStakeholder";
 import { MeetingsScreen } from "./screens/Meetings";
 import { MeetingScreen } from "./screens/MeetingDetail";
 import { EditMeetingScreen } from "./screens/EditMeeting";
+import { MeetingPrintScreen } from "./screens/MeetingPrint";
 import { CaptureScreen } from "./screens/Capture";
 import { ReviewScreen } from "./screens/Review";
 import { SearchScreen } from "./screens/Search";
@@ -127,6 +128,7 @@ function Inner() {
     case "meetings": body = <MeetingsScreen />; break;
     case "meeting": body = <MeetingScreen id={view.id} />; break;
     case "editMeeting": body = <EditMeetingScreen id={view.id} />; break;
+    case "meetingPrint": body = <MeetingPrintScreen id={view.id} />; break;
     case "capture": body = <CaptureScreen />; break;
     case "review": body = <ReviewScreen />; break;
     case "search": body = <SearchScreen />; break;
