@@ -6,13 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Eyebrow, Spinner } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
-import { commitmentLabel, fmtFull, stakeholderById } from "@/lib/utils";
+import { commitmentLabel, fmtFull, isOverdue, partyName, recurringConcernIds, stakeholderById } from "@/lib/utils";
 
-// Client-side PDF export for a single meeting (v1.10) — same reasoning as the weekly
-// report's export (see engineering reference, Design Decision #18): the app runs in
-// display: standalone as a bookmarked/installed PWA, where window.print() is unreliable,
-// especially on iOS. jsPDF is dynamically imported so it only loads when this screen's
-// export button is actually used.
+// Client-side PDF export for a single meeting (v1.10, restructured for AI ingestion in
+// v1.10.1). The layout is deliberately built for a parser as much as a human reader — it's
+// meant to also work well as source material for tools like NotebookLM that turn documents
+// into infographics/mind maps: an upfront numeric "at a glance" block, uniform field-labeled
+// lines (Owner: X -> Owed to: Y | Status: ... | text) instead of prose sentences, a
+// chronological "Key dates" timeline, and full stakeholder role/relationship data rather
+// than a bare name list. Same window.print()-avoidance reasoning as the weekly report export
+// (engineering reference, Design Decision #18): the app runs as an installed/standalone PWA,
+// where window.print() is unreliable on iOS.
 export function MeetingPrintScreen({ id }: { id: string }) {
   const { meetings, stakeholders } = useOrbit();
   const { go } = useFlow();
@@ -28,6 +32,13 @@ export function MeetingPrintScreen({ id }: { id: string }) {
     try {
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ unit: "pt", format: "a4" });
+      doc.setProperties({
+        title: m.title,
+        subject: "Orbit meeting export",
+        author: "Orbit",
+        keywords: m.topics.join(", "),
+      });
+
       const margin = 48;
       const width = doc.internal.pageSize.getWidth() - margin * 2;
       const pageBottom = doc.internal.pageSize.getHeight() - margin;
@@ -64,52 +75,98 @@ export function MeetingPrintScreen({ id }: { id: string }) {
       addBody(fmtFull(m.date));
       y += 6;
 
+      // 1. At-a-glance stats — plain "Label: N" lines, not prose. Infographic tools turn
+      // numbers like this directly into stat tiles/charts; reconstructing them by counting
+      // bullets elsewhere in the document is exactly what this section saves a parser from
+      // having to do.
+      const openExpectations = m.expectations.filter((e) => e.status !== "met").length;
+      const openCommitments = m.commitments.filter((c) => c.status !== "done").length;
+      const overdueCommitments = m.commitments.filter((c) => c.status !== "done" && isOverdue(c.dueDate)).length;
+      const doneCommitments = m.commitments.filter((c) => c.status === "done").length;
+      const recurringIds = recurringConcernIds(meetings, m.id);
+      addTitle("At a glance", 13, 18);
+      addBody(`Open commitments: ${openCommitments}${overdueCommitments ? ` (${overdueCommitments} overdue)` : ""}`);
+      if (doneCommitments) addBody(`Completed commitments: ${doneCommitments}`);
+      addBody(`Open expectations: ${openExpectations}`);
+      addBody(`Concerns raised: ${m.concerns.length}${recurringIds.size ? ` (${recurringIds.size} recurring)` : ""}`);
+      addBody(`Decisions recorded: ${m.decisions.length}`);
+      addBody(`Action items: ${m.actionItems.length}`);
+
       if (m.summary) {
+        y += 10;
         addTitle("Executive summary", 13, 18);
         addBody(m.summary);
       }
 
       addSection("Topics", m.topics);
 
+      // 2 & 3. Uniform field-labeled lines instead of prose sentences — every expectation/
+      // commitment/concern follows the same "Field: value | Field: value | text" shape, so a
+      // parser can treat each bullet as a row rather than having to extract meaning from a
+      // sentence.
       addSection(
         "Expectations",
         m.expectations.map((e) => {
-          const who = e.stakeholderId ? stakeholderById(stakeholders, e.stakeholderId)?.name : null;
-          return `${who ? `${who}: ` : ""}${e.text}${e.status === "met" ? " (met)" : ""}`;
+          const who = e.stakeholderId ? stakeholderById(stakeholders, e.stakeholderId)?.name ?? "Unspecified" : "Unspecified";
+          return `Stakeholder: ${who} | Status: ${e.status === "met" ? "Met" : "Open"} | ${e.text}`;
         })
       );
 
       addSection(
         "Commitments",
         m.commitments.map((c) => {
-          const due = c.dueDate ? `due ${fmtFull(c.dueDate)}` : c.due || "no due date";
-          return `${c.text} — ${commitmentLabel(c, stakeholders)}, ${due}${c.status === "done" ? " (done)" : ""}`;
+          const due = c.dueDate ? fmtFull(c.dueDate) : c.due || "None";
+          return `Owner: ${partyName(stakeholders, c.ownerId)} → Owed to: ${partyName(stakeholders, c.owedToId)} | Status: ${c.status === "done" ? "Done" : "Open"} | Due: ${due} | ${c.text}`;
         })
       );
 
       addSection(
         "Concerns",
         m.concerns.map((c) => {
-          const who = c.stakeholderId ? stakeholderById(stakeholders, c.stakeholderId)?.name : null;
-          return `${who ? `${who}: ` : ""}${c.text}`;
+          const who = c.stakeholderId ? stakeholderById(stakeholders, c.stakeholderId)?.name ?? "Unspecified" : "Unspecified";
+          return `Stakeholder: ${who} | Recurring: ${recurringIds.has(c.id) ? "Yes" : "No"} | ${c.text}`;
         })
       );
 
       addSection("Decisions", m.decisions);
       addSection("Action items", m.actionItems);
 
-      const mentionedNames = m.mentioned.map((sid) => stakeholderById(stakeholders, sid)?.name).filter((n): n is string => !!n);
-      if (mentionedNames.length) {
-        y += 10;
-        addTitle("Stakeholders mentioned", 13, 18);
-        addBody(mentionedNames.join(", "));
-      }
+      // 4. A dedicated chronological timeline of every dated commitment — ready-made
+      // material for a timeline-style infographic, rather than dates scattered through the
+      // Commitments section above.
+      const timeline = m.commitments
+        .filter((c) => c.dueDate)
+        .slice()
+        .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""))
+        .map((c) => `${fmtFull(c.dueDate)} — ${c.text} (${commitmentLabel(c, stakeholders)}, ${c.status === "done" ? "done" : "open"})`);
+      addSection("Key dates", timeline);
+
+      // 2. Full stakeholder rows (name/title/relationship), not just a bare name list — real
+      // fields for a relationship or org-chart diagram instead of unstructured text.
+      const mentionedStakeholders = m.mentioned
+        .map((sid) => stakeholderById(stakeholders, sid))
+        .filter((s): s is NonNullable<typeof s> => !!s);
+      addSection(
+        "Stakeholders",
+        mentionedStakeholders.map((s) => `${s.name} — ${s.title || "—"} — ${s.relationship}`)
+      );
 
       if (includeTranscript && m.transcript) {
         doc.addPage();
         y = margin;
         addTitle("Transcript", 15, 22);
         addBody(m.transcript, 10);
+      }
+
+      // 6. Page numbers + a footer stamp on every page.
+      const totalPages = doc.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(140);
+        doc.text(`Orbit meeting export · ${fmtFull(m.date)}`, margin, doc.internal.pageSize.getHeight() - 24);
+        doc.text(`Page ${i} of ${totalPages}`, doc.internal.pageSize.getWidth() - margin, doc.internal.pageSize.getHeight() - 24, { align: "right" });
       }
 
       const safeName = m.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 60);
@@ -133,8 +190,9 @@ export function MeetingPrintScreen({ id }: { id: string }) {
       </div>
 
       <p className="mb-4 text-[13.5px] leading-relaxed text-muted-foreground">
-        Builds a structured PDF of this meeting — summary, topics, expectations, commitments, concerns,
-        decisions, and action items — ready to save or share.
+        Builds a structured PDF of this meeting — an at-a-glance stats summary, topics, expectations,
+        commitments, concerns, decisions, action items, a dated timeline, and full stakeholder details —
+        ready to save, share, or feed into tools like NotebookLM.
       </p>
 
       <label className="mb-5 flex items-start gap-2.5 rounded-md border border-border bg-card px-3.5 py-3">
