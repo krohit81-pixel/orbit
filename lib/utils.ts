@@ -182,6 +182,28 @@ export function weeklyReportData(meetings: Meeting[], startISO: string): WeeklyR
   return { start, end, meetings: inWeek, topics: [...topics], decisions, actionItems, completed, upcoming };
 }
 
+// Which of one specific meeting's own concerns are recurring (i.e. similar() to a concern
+// raised in a strictly earlier meeting) — same corrected algorithm as todaysBriefData/
+// trajectory (v1.9.1: only ever compared against earlier meetings, never against concerns
+// within the same meeting), just scoped to a single target meeting instead of a time window
+// or a stakeholder. Used by the meeting PDF export's "at a glance" stats.
+export function recurringConcernIds(meetings: Meeting[], meetingId: string): Set<string> {
+  const asc = meetings.slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const seen: string[] = [];
+  const recurringIds = new Set<string>();
+  for (const m of asc) {
+    const thisTexts: string[] = [];
+    m.concerns.forEach((c) => {
+      const recurring = seen.some((s) => similar(s, c.text));
+      if (m.id === meetingId && recurring) recurringIds.add(c.id); // only count the target meeting's own concerns
+      thisTexts.push(c.text);
+    });
+    seen.push(...thisTexts);
+    if (m.id === meetingId) break; // nothing after the target meeting can matter
+  }
+  return recurringIds;
+}
+
 // ---- today's brief ----
 // Deterministic data assembly for Home's "Today's Brief" section; the LLM (the
 // "todaysBrief" task in app/api/llm/route.ts) only turns this into ranked prose — same
