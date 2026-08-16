@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Search, ChevronRight, ChevronDown, Sparkles, AlertTriangle, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Eyebrow, DueLabel, Spinner, vibrantCard } from "@/components/bits";
+import { CommitmentStrip, Eyebrow, DueLabel, Spinner, vibrantCard } from "@/components/bits";
 import { cn } from "@/lib/utils";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
@@ -175,6 +175,19 @@ export function HomeScreen() {
 
           {brief && (
             <div className="px-3.5 pb-3.5 pt-2">
+              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
+                Open commitments
+              </div>
+              {briefData.commitments.length === 0 ? (
+                <div className="mb-3 text-[13px] text-muted-foreground">Nothing outstanding.</div>
+              ) : (
+                <CommitmentStrip
+                  items={briefData.commitments.slice(0, 10)}
+                  stakeholders={stakeholders}
+                  onSelect={(meetingId) => go({ screen: "meeting", id: meetingId })}
+                />
+              )}
+
               <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                 <Sparkles className="h-3 w-3" /> Suggested priorities
               </div>
@@ -187,29 +200,6 @@ export function HomeScreen() {
                       <li key={i} className="text-[13.5px] leading-snug">• {p}</li>
                     ))}
                   </ul>
-                </div>
-              )}
-
-              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
-                Open commitments
-              </div>
-              {briefData.commitments.length === 0 ? (
-                <div className="mb-3 text-[13px] text-muted-foreground">Nothing outstanding.</div>
-              ) : (
-                <div className="mb-3 space-y-1.5">
-                  {briefData.commitments.slice(0, 5).map((cm) => (
-                    <div
-                      key={cm.id}
-                      onClick={() => go({ screen: "meeting", id: cm.meeting.id })}
-                      className="cursor-pointer rounded-md border border-primary/20 bg-card px-2.5 py-2"
-                    >
-                      <div className="text-[13.5px] font-medium leading-snug">{cm.text}</div>
-                      <div className="mt-0.5 flex items-center gap-2">
-                        <span className="text-[11.5px] font-semibold text-primary">{commitmentLabel(cm, stakeholders)}</span>
-                        <DueLabel dueDate={cm.dueDate} due={cm.due} done={cm.status === "done"} />
-                      </div>
-                    </div>
-                  ))}
                 </div>
               )}
 

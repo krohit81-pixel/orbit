@@ -67,6 +67,24 @@ export function bucketDue(s?: string | null): DueBucket {
   return "upcoming";
 }
 
+// Urgency bucket + short status word for the dashboard's open-commitments strip (v1.11).
+// Deliberately separate from bucketDue()/DueBucket above (which drive DueLabel and the
+// commitments-by-stakeholder sort and use a 7-day "week" window) — the strip wants a
+// tighter 3-day amber cutoff, and keeping it a distinct function means that doesn't ripple
+// into sorting or DueLabel elsewhere.
+export type TileBucket = "overdue" | "soon" | "later" | "undated";
+export function dueTileInfo(s?: string | null): { bucket: TileBucket; label: string } {
+  if (!s) return { bucket: "undated", label: "No date" };
+  const t = new Date();
+  t.setHours(0, 0, 0, 0);
+  const days = Math.round((new Date(s + "T00:00:00").getTime() - t.getTime()) / 86400000);
+  if (days < 0) return { bucket: "overdue", label: "Overdue" };
+  if (days === 0) return { bucket: "soon", label: "Due today" };
+  if (days === 1) return { bucket: "soon", label: "Due tmrw" };
+  if (days <= 3) return { bucket: "soon", label: `${days} days` };
+  return { bucket: "later", label: fmtDate(s) ?? "" };
+}
+
 // ---- text / search ----
 export const norm = (s?: string): string => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 export function matchesQuery(query: string, text?: string): boolean {
