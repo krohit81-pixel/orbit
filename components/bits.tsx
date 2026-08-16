@@ -1,6 +1,7 @@
 import { Quote, Star, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { bucketDue, fmtFull } from "@/lib/utils";
+import { bucketDue, commitmentLabel, dueTileInfo, fmtFull, type OpenCommitment, type TileBucket } from "@/lib/utils";
+import type { Stakeholder } from "@/lib/types";
 import type { Theme } from "@/components/ThemeProvider";
 
 // Shared "vibrant" card treatment — a soft violet border + tinted shadow, used on the
@@ -30,6 +31,57 @@ export function DueLabel({ dueDate, due, done, className }: { dueDate?: string |
     <span className={cn("text-[12px] font-medium", overdue ? "text-warm" : "text-muted-foreground/70", className)}>
       {text}
     </span>
+  );
+}
+
+// Grid of colored square tiles for the dashboard's "how's this week" glance (v1.11) — one
+// tile per open commitment, most urgent first, colored red/amber/green by dueTileInfo()
+// (undated commitments get a neutral tile). Replaces the plain list that used to live here —
+// the full list is still available further down in "Commitments by stakeholder".
+//
+// `auto-fill, minmax(100px, 1fr)` (rather than a fixed column count) is what gives the "max
+// 3 per line on a phone, more on iPad/macOS" behavior for free: the grid just fits as many
+// >=100px columns as the content width allows, and Shell's phone-frame column (max-w-[430px]
+// minus padding) only ever has room for 3.
+const STRIP_TILE_CLASS: Record<TileBucket, string> = {
+  overdue: "bg-warm text-warm-foreground",
+  soon: "bg-caution text-caution-foreground",
+  later: "bg-success text-success-foreground",
+  undated: "bg-secondary text-secondary-foreground",
+};
+
+export function CommitmentStrip({
+  items, stakeholders, onSelect,
+}: {
+  items: OpenCommitment[];
+  stakeholders: Stakeholder[];
+  onSelect: (meetingId: string) => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div className="mb-3 grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
+      {items.map((cm) => {
+        const { bucket, label } = dueTileInfo(cm.dueDate);
+        return (
+          <button
+            key={cm.id}
+            onClick={() => onSelect(cm.meeting.id)}
+            className={cn(
+              "flex aspect-square flex-col overflow-hidden rounded-xl px-2.5 py-2.5 text-left",
+              STRIP_TILE_CLASS[bucket]
+            )}
+          >
+            {/* shrink-0 on these two keeps them full-height even when the caption below is
+                long — only the (already 2-line-clamped) caption should ever give up space. */}
+            <span className="block shrink-0 truncate text-[9.5px] font-semibold uppercase tracking-[0.08em] opacity-80">
+              {commitmentLabel(cm, stakeholders)}
+            </span>
+            <span className="mt-1.5 block shrink-0 text-[14px] font-extrabold leading-tight">{label}</span>
+            <span className="mt-0.5 line-clamp-2 block text-[10.5px] leading-snug opacity-90">{cm.text}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

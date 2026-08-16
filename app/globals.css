@@ -27,6 +27,12 @@
     --warm: 348 62% 47%;             /* Teams red for overdue/destructive */
     --warm-foreground: 0 0% 100%;
 
+    --caution: 34 90% 42%;           /* amber — due this week, not yet overdue */
+    --caution-foreground: 0 0% 100%;
+
+    --success: 142 55% 34%;          /* green — upcoming, plenty of runway */
+    --success-foreground: 0 0% 100%;
+
     --border: 240 12% 90%;
     --input: 240 12% 86%;
     --ring: 235 49% 57%;
@@ -57,6 +63,12 @@
 
     --warm: 348 65% 63%;
     --warm-foreground: 0 0% 100%;
+
+    --caution: 34 85% 50%;
+    --caution-foreground: 0 0% 100%;
+
+    --success: 142 45% 45%;
+    --success-foreground: 0 0% 100%;
 
     --border: 240 6% 25%;
     --input: 240 6% 29%;
