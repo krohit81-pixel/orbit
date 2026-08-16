@@ -16,7 +16,7 @@ import type { TodaysBrief } from "@/lib/types";
 const BRIEF_CACHE_KEY = "orbit-todays-brief";
 
 export function HomeScreen() {
-  const { self, stakeholders, meetings } = useOrbit();
+  const { stakeholders, meetings } = useOrbit();
   const { go } = useFlow();
   const open = openCommitmentsInvolvingMe(meetings);
 
@@ -129,7 +129,6 @@ export function HomeScreen() {
 
   return (
     <div>
-      <Eyebrow>Welcome back, {self.name}</Eyebrow>
       <h1 className="mb-4 mt-1 text-[26px] font-bold leading-tight tracking-tight">What needs your attention</h1>
 
       {meetings.length > 0 && (
@@ -194,12 +193,12 @@ export function HomeScreen() {
               {brief.priorities.length === 0 ? (
                 <div className="mb-3 text-[13px] text-muted-foreground">Nothing urgent stands out.</div>
               ) : (
-                <div className="mb-3 rounded-md border border-primary/20 bg-card px-3 py-2.5">
-                  <ul className="space-y-1.5">
-                    {brief.priorities.map((p, i) => (
-                      <li key={i} className="text-[13.5px] leading-snug">• {p}</li>
-                    ))}
-                  </ul>
+                <div className="mb-3 space-y-1.5">
+                  {brief.priorities.map((p, i) => (
+                    <div key={i} className="rounded-md border border-primary/20 bg-card px-2.5 py-2">
+                      <div className="text-[13.5px] font-medium leading-snug">{p}</div>
+                    </div>
+                  ))}
                 </div>
               )}
 

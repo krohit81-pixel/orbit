@@ -144,6 +144,18 @@ export function commitmentLabel(c: Commitment, stakeholders: Stakeholder[]): str
   if (c.owedToId === SELF) return `${owner} owes you`;
   return c.owedToId ? `${owner} owes ${owed}` : `${owner} committed`;
 }
+// Compact counterparty for the dashboard strip's tiles (v1.11) — just a direction + name,
+// no "You owe"/"owes you" phrasing (CommitmentStrip renders the direction as a small arrow
+// icon instead, so the name gets more of the tile's limited width). Every commitment reaching
+// this has already passed openCommitmentsInvolvingMe, so ownerId or owedToId is always SELF —
+// "self" covers the one remaining edge case, "You owe" with no counterparty specified.
+export function tileCounterparty(c: Commitment, stakeholders: Stakeholder[]): { name: string; direction: "out" | "in" | "self" } {
+  if (c.ownerId === SELF) {
+    if (!c.owedToId || c.owedToId === SELF) return { name: "You", direction: "self" };
+    return { name: partyName(stakeholders, c.owedToId), direction: "out" };
+  }
+  return { name: partyName(stakeholders, c.ownerId), direction: "in" };
+}
 // The other party from the user's perspective (for grouping); null if third-party.
 export function otherParty(c: Commitment): string | null {
   if (c.ownerId === SELF) return c.owedToId && c.owedToId !== SELF ? c.owedToId : null;
