@@ -1,6 +1,6 @@
-import { Quote, Star, Sun, Moon } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Quote, Star, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { bucketDue, commitmentLabel, dueTileInfo, fmtFull, type OpenCommitment, type TileBucket } from "@/lib/utils";
+import { bucketDue, dueTileInfo, fmtFull, tileCounterparty, type OpenCommitment, type TileBucket } from "@/lib/utils";
 import type { Stakeholder } from "@/lib/types";
 import type { Theme } from "@/components/ThemeProvider";
 
@@ -62,6 +62,7 @@ export function CommitmentStrip({
     <div className="mb-3 grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
       {items.map((cm) => {
         const { bucket, label } = dueTileInfo(cm.dueDate);
+        const { name, direction } = tileCounterparty(cm, stakeholders);
         return (
           <button
             key={cm.id}
@@ -71,13 +72,17 @@ export function CommitmentStrip({
               STRIP_TILE_CLASS[bucket]
             )}
           >
-            {/* shrink-0 on these two keeps them full-height even when the caption below is
-                long — only the (already 2-line-clamped) caption should ever give up space. */}
-            <span className="block shrink-0 truncate text-[9.5px] font-semibold uppercase tracking-[0.08em] opacity-80">
-              {commitmentLabel(cm, stakeholders)}
+            {/* shrink-0 on the name and due-status lines keeps them full-height even when
+                the caption below is long — only the (line-clamped) caption should ever give
+                up space. An arrow instead of "You owe"/"owes you" text saves enough width
+                that the counterparty's name usually fits without truncating. */}
+            <span className="flex shrink-0 items-center gap-0.5 truncate text-[10px] font-semibold uppercase tracking-[0.04em] opacity-85">
+              {direction === "out" && <ArrowUpRight className="h-3 w-3 shrink-0" aria-label="You owe" />}
+              {direction === "in" && <ArrowDownLeft className="h-3 w-3 shrink-0" aria-label="Owed to you" />}
+              <span className="truncate">{name}</span>
             </span>
             <span className="mt-1.5 block shrink-0 text-[14px] font-extrabold leading-tight">{label}</span>
-            <span className="mt-0.5 line-clamp-2 block text-[10.5px] leading-snug opacity-90">{cm.text}</span>
+            <span className="mt-0.5 line-clamp-3 text-[10.5px] leading-snug opacity-90">{cm.text}</span>
           </button>
         );
       })}
