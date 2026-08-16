@@ -39,10 +39,15 @@ export function DueLabel({ dueDate, due, done, className }: { dueDate?: string |
 // (undated commitments get a neutral tile). Replaces the plain list that used to live here —
 // the full list is still available further down in "Commitments by stakeholder".
 //
-// `auto-fill, minmax(100px, 1fr)` (rather than a fixed column count) is what gives the "max
-// 3 per line on a phone, more on iPad/macOS" behavior for free: the grid just fits as many
-// >=100px columns as the content width allows, and Shell's phone-frame column (max-w-[430px]
-// minus padding) only ever has room for 3.
+// Fixed 3 columns below Shell's own DESKTOP_BREAKPOINT (700px, kept in sync with that
+// constant here since Tailwind's default `md:` (768px) doesn't quite match it) — a flat
+// `grid-cols-3` rather than `auto-fill, minmax(...)`. auto-fill was the first attempt (see
+// v1.11.0/v1.11.1 history) on the theory that Shell's phone-frame column only ever has room
+// for 3 >=100px tracks, but that math was tighter than it looked once the brief card's own
+// padding was accounted for — real devices landed on 2 columns, not 3. A flat count is
+// simpler and doesn't depend on getting that arithmetic exactly right. At/above the
+// breakpoint (iPad/macOS sidebar layout, wider column) auto-fill takes back over so more
+// tiles fit per row as the window grows.
 const STRIP_TILE_CLASS: Record<TileBucket, string> = {
   overdue: "bg-warm text-warm-foreground",
   soon: "bg-caution text-caution-foreground",
@@ -59,7 +64,7 @@ export function CommitmentStrip({
 }) {
   if (items.length === 0) return null;
   return (
-    <div className="mb-3 grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
+    <div className="mb-3 grid grid-cols-3 gap-2 min-[700px]:grid-cols-[repeat(auto-fill,minmax(110px,1fr))]">
       {items.map((cm) => {
         const { bucket, label } = dueTileInfo(cm.dueDate);
         const { name, direction } = tileCounterparty(cm, stakeholders);
