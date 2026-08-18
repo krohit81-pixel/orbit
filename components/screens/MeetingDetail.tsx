@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Eyebrow, SectionTitle, SourceQuote, DueLabel, vibrantCard, Spinner } from "@/components/bits";
 import { CommitmentUpdates } from "@/components/CommitmentUpdates";
+import { MeetingSnapshot } from "@/components/MeetingSnapshot";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
 import { cn, fmtFull, stakeholderById, commitmentLabel } from "@/lib/utils";
@@ -47,6 +48,7 @@ export function MeetingScreen({ id }: { id: string }) {
         <CardContent>
           <Eyebrow>Executive summary</Eyebrow>
           <div className="mt-2 text-[16px] leading-relaxed">{m.summary}</div>
+          <MeetingSnapshot meeting={m} />
         </CardContent>
       </Card>
 

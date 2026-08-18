@@ -48,11 +48,21 @@ export function DueLabel({ dueDate, due, done, className }: { dueDate?: string |
 // simpler and doesn't depend on getting that arithmetic exactly right. At/above the
 // breakpoint (iPad/macOS sidebar layout, wider column) auto-fill takes back over so more
 // tiles fit per row as the window grows.
+// Bg-only half of the mapping, exported so MeetingSnapshot's commitment-status dots (v1.12)
+// use exactly the same red/amber/green background tokens as these tiles — one source of
+// truth for the color, rather than a second mapping (or string-parsing this one) that could
+// drift from it. STRIP_TILE_CLASS below just adds each bucket's foreground text color.
+export const TILE_BUCKET_BG: Record<TileBucket, string> = {
+  overdue: "bg-warm",
+  soon: "bg-caution",
+  later: "bg-success",
+  undated: "bg-secondary",
+};
 const STRIP_TILE_CLASS: Record<TileBucket, string> = {
-  overdue: "bg-warm text-warm-foreground",
-  soon: "bg-caution text-caution-foreground",
-  later: "bg-success text-success-foreground",
-  undated: "bg-secondary text-secondary-foreground",
+  overdue: `${TILE_BUCKET_BG.overdue} text-warm-foreground`,
+  soon: `${TILE_BUCKET_BG.soon} text-caution-foreground`,
+  later: `${TILE_BUCKET_BG.later} text-success-foreground`,
+  undated: `${TILE_BUCKET_BG.undated} text-secondary-foreground`,
 };
 
 export function CommitmentStrip({

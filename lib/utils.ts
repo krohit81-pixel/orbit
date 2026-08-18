@@ -179,6 +179,26 @@ function collectCommitments(meetings: Meeting[], predicate: (c: Commitment) => b
 export const myOpenCommitments = (meetings: Meeting[]) => collectCommitments(meetings, (c) => c.ownerId === SELF);
 export const owedToMe = (meetings: Meeting[]) => collectCommitments(meetings, (c) => c.owedToId === SELF && c.ownerId !== SELF);
 export const openCommitmentsInvolvingMe = (meetings: Meeting[]) => collectCommitments(meetings, involvesMe);
+// Every open commitment, regardless of who it's between — unlike the three above, not
+// filtered to ones involving "me". Feeds openCommitmentsDigest below: a new meeting might
+// close or progress a commitment between two other parties just as easily as one of mine.
+export const allOpenCommitments = (meetings: Meeting[]) => collectCommitments(meetings, () => true);
+
+// Compact, [id]-tagged digest of currently open commitments, fed to the "extract" LLM task
+// (v1.12) alongside a new meeting's transcript so it can suggest which ones this meeting
+// closes, revises the due date on, or otherwise progresses — same "[id] tag so the UI can
+// re-resolve it against real data, never trust the model's own restated text" pattern as
+// assistantDigest. Sorted soonest-due first (undated last) and capped — this is prompt
+// input, not a report, so it should stay bounded even as history grows.
+export function openCommitmentsDigest(meetings: Meeting[], stakeholders: Stakeholder[], cap = 40): string {
+  const open = allOpenCommitments(meetings)
+    .slice()
+    .sort((a, b) => (a.dueDate || "9999-99-99").localeCompare(b.dueDate || "9999-99-99"));
+  return open
+    .slice(0, cap)
+    .map((c) => `[${c.id}] ${commitmentLabel(c, stakeholders)}: ${c.text}${c.dueDate ? ` (due ${fmtFull(c.dueDate)})` : c.due ? ` (due ${c.due})` : " (no due date)"}`)
+    .join("\n");
+}
 
 // ---- weekly report ----
 // Deterministic data assembly for a Monday-start week; the LLM only turns this into

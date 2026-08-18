@@ -18,10 +18,17 @@ import { ReviewScreen } from "./screens/Review";
 import { SearchScreen } from "./screens/Search";
 import { WeeklyReportScreen } from "./screens/WeeklyReport";
 import { Spinner } from "./bits";
-import { todayISO, uid } from "@/lib/utils";
-import type { Extraction, ReviewModel, ReviewPerson } from "@/lib/types";
+import { allOpenCommitments, commitmentLabel, openCommitmentsDigest, todayISO, uid } from "@/lib/utils";
+import type { Extraction, Meeting, ReviewCommitmentSuggestion, ReviewModel, ReviewPerson, Stakeholder } from "@/lib/types";
 
-function buildReview(ex: Extraction, knownNames: Set<string>, date: string, transcript: string): ReviewModel {
+function buildReview(
+  ex: Extraction,
+  knownNames: Set<string>,
+  date: string,
+  transcript: string,
+  meetings: Meeting[],
+  stakeholders: Stakeholder[]
+): ReviewModel {
   const names = new Set<string>();
   ex.stakeholders?.forEach((p) => p.name && names.add(p.name));
   ex.expectations?.forEach((x) => x.stakeholder && names.add(x.stakeholder));
@@ -37,6 +44,31 @@ function buildReview(ex: Extraction, knownNames: Set<string>, date: string, tran
     role: ex.stakeholders?.find((s) => s.name === n)?.role ?? null,
     existing: knownNames.has(n.toLowerCase().trim()),
   }));
+
+  // Resolve each suggestion's [id] against real open commitments — commitmentText/
+  // commitmentLabel come from OUR data, never the model's own restated text, so what's shown
+  // in Review is always factually accurate even though the judgment (which commitment,
+  // which action) came from the LLM. Anything that doesn't resolve (a stale or invented ref)
+  // is silently dropped, same defensive pattern Search's "Ask Orbit" uses for its sources.
+  const open = allOpenCommitments(meetings);
+  const commitmentSuggestions: ReviewCommitmentSuggestion[] = (ex.commitmentSuggestions || [])
+    .map((s) => {
+      const match = open.find((c) => c.id === s.commitmentRef);
+      if (!match) return null;
+      return {
+        _id: uid(),
+        include: true,
+        meetingId: match.meeting.id,
+        commitmentId: match.id,
+        commitmentText: match.text,
+        commitmentLabel: commitmentLabel(match, stakeholders),
+        action: s.action,
+        newDueDate: s.newDueDate ?? null,
+        reason: s.reason,
+      };
+    })
+    .filter((x): x is ReviewCommitmentSuggestion => x !== null);
+
   return {
     title: ex.title || "Untitled meeting",
     date,
@@ -48,6 +80,7 @@ function buildReview(ex: Extraction, knownNames: Set<string>, date: string, tran
     concerns: (ex.concerns || []).map((x) => ({ ...x, _id: uid(), include: true })),
     decisions: ex.decisions || [],
     actionItems: ex.actionItems || [],
+    commitmentSuggestions,
     transcript,
   };
 }
@@ -89,11 +122,18 @@ function Inner() {
       const res = await fetch("/api/llm", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ task: "extract", transcript: draft, known: store.stakeholders.map((s) => s.name).join(", "), today: todayISO(), meetingDate }),
+        body: JSON.stringify({
+          task: "extract",
+          transcript: draft,
+          known: store.stakeholders.map((s) => s.name).join(", "),
+          today: todayISO(),
+          meetingDate,
+          openCommitments: openCommitmentsDigest(store.meetings, store.stakeholders),
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.extraction) throw new Error(data.error || "Extraction failed.");
-      setReview(buildReview(data.extraction, knownNames(), meetingDate, draft));
+      setReview(buildReview(data.extraction, knownNames(), meetingDate, draft, store.meetings, store.stakeholders));
       setView({ screen: "review" });
     } catch (e) {
       setErr((e instanceof Error ? e.message : "Extraction failed.") + " You can load the sample result to continue.");
@@ -103,13 +143,27 @@ function Inner() {
   };
 
   const loadSample = () => {
-    setReview(buildReview(SAMPLE_EXTRACTION, knownNames(), meetingDate, draft));
+    setReview(buildReview(SAMPLE_EXTRACTION, knownNames(), meetingDate, draft, store.meetings, store.stakeholders));
     setView({ screen: "review" });
   };
 
   const commit = async () => {
     if (!review) return;
     await store.commitMeeting(review);
+    // Apply accepted commitment-update suggestions against the EXISTING meetings/commitments
+    // they refer to — separate from the new meeting just committed above. Each rides the
+    // ordinary addCommitmentUpdate path (audit-trail entry + optional close/date-revision),
+    // so it shows up in that commitment's normal update timeline, not as anything special.
+    // Sequential and best-effort: addCommitmentUpdate already rolls back and alerts on its
+    // own failure, so one bad write doesn't block the rest.
+    for (const s of review.commitmentSuggestions.filter((x) => x.include)) {
+      await store.addCommitmentUpdate(s.meetingId, s.commitmentId, {
+        note: s.reason,
+        date: meetingDate,
+        newDueDate: s.action === "revise_date" ? s.newDueDate ?? null : undefined,
+        markDone: s.action === "close",
+      });
+    }
     setReview(null);
     setDraft("");
     setMeetingDate(todayISO());

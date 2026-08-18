@@ -52,14 +52,21 @@ export async function POST(req: Request) {
       const known = String(body.known || "");
       const meetingDate = String(body.meetingDate || body.today || new Date().toISOString().slice(0, 10));
       const weekday = new Date(meetingDate + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long" });
+      const openCommitments = String(body.openCommitments || "");
       const system = `You are the extraction engine for Orbit, an executive intelligence app. The user (the leader) is named Rohit.
 This meeting took place on ${meetingDate} (${weekday}). Resolve any relative due dates ("next week", "by the 30th", "end of month") RELATIVE TO THE MEETING DATE, not to today.
 From the meeting transcript, extract structured intelligence. Known stakeholders: ${known || "(none yet)"}.
 Attribute each item to a stakeholder by full name when clear, otherwise null.
 Commitments have a direction: capture WHO owes it ("owner") and WHO it is owed to ("owedTo"). Each is a stakeholder's full name, or "me" for Rohit, or null if unclear. Examples: Rohit promises Jo -> owner "me", owedTo "Jo". Tim promises Rohit -> owner "Tim", owedTo "me". David promises Priya -> owner "David", owedTo "Priya".
-For every expectation, commitment and concern, include a short verbatim "source" quote (under 12 words) taken from the transcript.
+For every expectation, commitment and concern, include a short verbatim "source" quote (under 12 words) taken from the transcript.${openCommitments ? `
+
+You are also given Rohit's currently OPEN commitments from past meetings, each tagged with its [id]. For every one this NEW meeting closes, progresses, or requires a due-date change to, add an entry to "commitmentSuggestions" — including when the meeting itself simply IS the thing the commitment described (e.g. an open commitment "meet with Ko Saito" is satisfied just by this being a meeting with Ko Saito, even with no explicit closing statement in the transcript). Don't suggest anything for a commitment this meeting doesn't actually touch, and never invent an [id] that isn't in the list below.
+
+Open commitments:
+${openCommitments}` : ""}
 Respond with ONLY valid JSON (no markdown, no commentary) in exactly this shape:
-{"title":"short meeting title","summary":"1-2 sentence executive summary","topics":["..."],"stakeholders":[{"name":"...","role":"... or null"}],"expectations":[{"text":"...","stakeholder":"name or null","source":"..."}],"commitments":[{"text":"...","owner":"me or name","owedTo":"me or name or null","due":"human due label or null","dueDate":"YYYY-MM-DD or null","source":"..."}],"concerns":[{"text":"...","stakeholder":"name or null","source":"..."}],"decisions":["..."],"actionItems":["..."]}`;
+{"title":"short meeting title","summary":"1-2 sentence executive summary","topics":["..."],"stakeholders":[{"name":"...","role":"... or null"}],"expectations":[{"text":"...","stakeholder":"name or null","source":"..."}],"commitments":[{"text":"...","owner":"me or name","owedTo":"me or name or null","due":"human due label or null","dueDate":"YYYY-MM-DD or null","source":"..."}],"concerns":[{"text":"...","stakeholder":"name or null","source":"..."}],"decisions":["..."],"actionItems":["..."],"commitmentSuggestions":[{"commitmentRef":"the [id] from the open commitments list","action":"close, revise_date, or progress_note","newDueDate":"YYYY-MM-DD or null — only for revise_date, resolved relative to this meeting's date","reason":"short, specific, grounded in this transcript, under 20 words"}]}
+If there are no open commitments listed above, or none of them are touched by this meeting, return an empty array for "commitmentSuggestions".`;
       const raw = await callClaude(system, transcript, 8192);
       let parsed;
       try {
