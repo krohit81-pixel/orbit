@@ -1,20 +1,27 @@
 "use client";
 
-import { ArrowLeft, Check, CircleDot, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Check, CircleDot, CheckCircle2, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Eyebrow, SectionTitle, SourceQuote, DueLabel } from "@/components/bits";
 import { useFlow } from "@/components/flow";
+import { fmtFull } from "@/lib/utils";
 import type { ReviewModel } from "@/lib/types";
+
+const SUGGESTION_ACTION_LABEL: Record<string, string> = {
+  close: "Mark as done",
+  revise_date: "Revise due date",
+  progress_note: "Log a progress note",
+};
 
 export function ReviewScreen() {
   const { review, setReview, go, commit } = useFlow();
   if (!review) return <div className="py-10 text-center text-muted-foreground">Nothing to review.</div>;
   const r = review;
 
-  const toggle = (key: "people" | "expectations" | "commitments" | "concerns", id: string) => {
+  const toggle = (key: "people" | "expectations" | "commitments" | "concerns" | "commitmentSuggestions", id: string) => {
     setReview({
       ...r,
       [key]: (r[key] as { _id: string; include: boolean }[]).map((x) =>
@@ -48,6 +55,31 @@ export function ReviewScreen() {
         <Input type="date" className="mt-2 w-auto" value={r.date} onChange={(e) => setReview({ ...r, date: e.target.value })} />
         <div className="mt-2.5 font-serif text-[15.5px] leading-relaxed">{r.summary}</div>
       </CardContent></Card>
+
+      {r.commitmentSuggestions.length > 0 && (
+        <div className="mb-4">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
+            <Sparkles className="h-3 w-3" /> Suggested commitment updates
+          </div>
+          <p className="mb-2.5 text-[12.5px] leading-relaxed text-muted-foreground">
+            This meeting looks like it touches these existing open commitments. Accepted ones update them directly — they aren&apos;t committed as new items below.
+          </p>
+          {r.commitmentSuggestions.map((s) => (
+            <Card key={s._id} className={`mb-2.5 ${s.include ? "" : "opacity-45"}`}><CardContent className="flex items-start gap-2.5">
+              <Toggle on={s.include} onClick={() => toggle("commitmentSuggestions", s._id)} />
+              <div className="flex-1">
+                <div className="text-[11.5px] font-semibold text-primary">{s.commitmentLabel}</div>
+                <div className="font-semibold">{s.commitmentText}</div>
+                <div className="mt-1 text-[12.5px] font-medium text-foreground">
+                  {SUGGESTION_ACTION_LABEL[s.action]}
+                  {s.action === "revise_date" && s.newDueDate ? ` → ${fmtFull(s.newDueDate)}` : ""}
+                </div>
+                <SourceQuote>{s.reason}</SourceQuote>
+              </div>
+            </CardContent></Card>
+          ))}
+        </div>
+      )}
 
       <SectionTitle>People ({r.people.filter((p) => p.include).length})</SectionTitle>
       {r.people.map((p) => (

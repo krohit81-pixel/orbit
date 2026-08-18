@@ -75,6 +75,17 @@ export interface Meeting {
 
 // --- extraction / review shapes ---
 export interface ExtractedPerson { name: string; role?: string | null }
+// A suggestion that this NEW meeting closes, revises the due date on, or otherwise
+// progresses an EXISTING open commitment from a past meeting (v1.12). "commitmentRef" is
+// one of the [id]s from the openCommitmentsDigest sent in the prompt — the UI re-resolves
+// it against real data and drops anything that doesn't match, same defensive pattern as
+// AssistantSource. See lib/utils.openCommitmentsDigest and the "extract" LLM task.
+export interface ExtractedCommitmentSuggestion {
+  commitmentRef: string;
+  action: "close" | "revise_date" | "progress_note";
+  newDueDate?: string | null; // only meaningful for "revise_date"
+  reason: string; // short, grounded in this transcript — shown to the user before they accept it
+}
 export interface Extraction {
   title: string;
   summary: string;
@@ -85,6 +96,7 @@ export interface Extraction {
   concerns: { text: string; stakeholder?: string | null; source?: string }[];
   decisions: string[];
   actionItems: string[];
+  commitmentSuggestions?: ExtractedCommitmentSuggestion[];
 }
 
 // Generated on demand (not persisted) — consistent with Orbit's "derived, not stored"
@@ -120,6 +132,20 @@ export interface AssistantAnswer { answer: string; sources: AssistantSource[] }
 
 export interface ReviewItem { _id: string; include: boolean; [k: string]: unknown }
 export interface ReviewPerson extends ReviewItem { name: string; role?: string | null; existing: boolean }
+// A resolved, ready-to-apply commitment suggestion (v1.12) — built in Orbit.tsx's
+// buildReview() by matching the LLM's commitmentRef against real open commitments.
+// commitmentText/commitmentLabel are pulled fresh from OUR data, never from the model's own
+// restated text, so what's shown before commit is always factually accurate even though the
+// judgment (which commitment, which action) came from the LLM.
+export interface ReviewCommitmentSuggestion extends ReviewItem {
+  meetingId: string; // the EXISTING meeting the target commitment lives in
+  commitmentId: string;
+  commitmentText: string;
+  commitmentLabel: string; // e.g. "You owe Ko Saito"
+  action: "close" | "revise_date" | "progress_note";
+  newDueDate: string | null;
+  reason: string;
+}
 export interface ReviewModel {
   title: string;
   date: string; // ISO yyyy-mm-dd, editable before commit
@@ -131,5 +157,6 @@ export interface ReviewModel {
   concerns: (ReviewItem & { text: string; stakeholder?: string | null; source?: string })[];
   decisions: string[];
   actionItems: string[];
+  commitmentSuggestions: ReviewCommitmentSuggestion[];
   transcript?: string; // the raw pasted text this review was extracted from
 }

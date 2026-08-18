@@ -21,7 +21,7 @@ interface OrbitContextValue {
   saveMeeting: (m: Meeting) => Promise<void>;
   deleteMeeting: (id: string) => Promise<void>;
   toggleCommitment: (meetingId: string, commId: string) => Promise<void>;
-  addCommitmentUpdate: (meetingId: string, commId: string, input: { note: string; date: string; newDueDate?: string | null }) => Promise<void>;
+  addCommitmentUpdate: (meetingId: string, commId: string, input: { note: string; date: string; newDueDate?: string | null; markDone?: boolean }) => Promise<void>;
   setSummary: (sid: string, summary: string) => Promise<void>;
 }
 
@@ -164,12 +164,14 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Append-only progress log for a commitment, with an optional due-date revision recorded
-  // alongside it (v1.8). Follows toggleCommitment's optimistic-then-rollback shape, since
-  // this is a data-integrity write like any other.
+  // alongside it (v1.8), and an optional markDone (v1.12, for suggestions accepted out of
+  // Review — see Orbit.tsx's commit()) that also closes the commitment in the same write.
+  // Follows toggleCommitment's optimistic-then-rollback shape, since this is a
+  // data-integrity write like any other.
   const addCommitmentUpdate = useCallback(async (
     meetingId: string,
     commId: string,
-    input: { note: string; date: string; newDueDate?: string | null }
+    input: { note: string; date: string; newDueDate?: string | null; markDone?: boolean }
   ) => {
     let prevCommitments: Meeting["commitments"] | null = null;
     let nextCommitments: Meeting["commitments"] | null = null;
@@ -192,6 +194,7 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
           updates: [...(cm.updates ?? []), entry],
           dueDate: revisingDue ? input.newDueDate ?? null : cm.dueDate,
           due: revisingDue ? null : cm.due, // the human due label is now stale once dueDate moves
+          status: input.markDone ? ("done" as const) : cm.status,
         };
       });
       nextCommitments = commitments;
