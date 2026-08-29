@@ -7,23 +7,25 @@ relationship has evolved over time**, including a deterministic Relationship Hea
 rating that correctly distinguishes people you've actually talked to from people only
 ever mentioned by someone else.
 
-Single-user **v1.10.2**. Next.js (App Router) + TypeScript + Tailwind + shadcn-style UI,
+Single-user **v1.12.0**. Next.js (App Router) + TypeScript + Tailwind + shadcn-style UI,
 with **Supabase** as the data layer and server-side LLM extraction (Anthropic only — no
 other AI provider is used anywhere in the app). Deployable to Vercel. Responsive: a
 phone-frame cockpit below ~700px viewport width, a sidebar-nav desktop layout at or above it
 (macOS browser windows, iPad).
 
 > **Full version history and the reasoning behind every decision** live in
-> `documents/orbit-master-context-v1.10.md` (product/philosophy) and
-> `documents/engineering-reference-v1.10.md` (architecture) in the parent project folder —
+> `documents/orbit-master-context-v1.12.md` (product/philosophy) and
+> `documents/engineering-reference-v1.12.md` (architecture) in the parent project folder —
 > this README covers what the app does today and how to set it up, not a changelog.
 
 ## What Orbit does today
 
-- **Home** — a manually-refreshed **Today's Brief** (suggested priorities, open
-  commitments, and clickable potential risks/concerns — never auto-generates; shows the
-  last-generated brief with a timestamp until you tap refresh), then recent meetings and
-  open commitments grouped by stakeholder (including a "You" group for commitments with no
+- **Home** — a manually-refreshed **Today's Brief**, opening with a **color-coded
+  open-commitments status grid** (one tile per open commitment, most urgent first — red
+  overdue, amber due within 3 days, green due later, gray undated; never auto-generates,
+  shows the last-generated brief with a timestamp until you tap refresh), then suggested
+  priorities and clickable potential risks/concerns, then recent meetings and open
+  commitments grouped by stakeholder (including a "You" group for commitments with no
   specific counterparty), all collapsed by default.
 - **People** — stakeholder cards; manual add (name, title, relationship, optional "reports
   to"). Relationship taxonomy: Sponsor, Functional lead, My manager, Peer, Reports to me,
@@ -35,10 +37,14 @@ phone-frame cockpit below ~700px viewport width, a sidebar-nav desktop layout at
   every interaction with new-vs-recurring concerns flagged; open expectations and
   commitments in both directions, each with its own progress-update history.
 - **Meetings** — paste a transcript → AI extraction → **review before commit** (toggle off
-  anything wrong; every item shows its source quote) → saved. Full edit/delete, an
-  always-editable transcript field, and an **Export** button that builds a structured PDF of
-  the meeting — optionally including the transcript and a ready-to-paste "infographic
-  prompt" for tools like NotebookLM.
+  anything wrong; every item shows its source quote). As of v1.12, that same review step also
+  surfaces **suggested updates to your existing open commitments** when the new meeting
+  touches one — closing it, revising its due date, or logging a progress note, each with a
+  grounded reason and its own toggle, applied only when you commit. Every meeting opens with a
+  **deterministic "at a glance" snapshot** (stat counts + a color-coded commitment-status
+  strip) above the detail sections. Full edit/delete, an always-editable transcript field, and
+  an **Export** button that builds a structured PDF of the meeting — optionally including the
+  transcript and a ready-to-paste "infographic prompt" for tools like NotebookLM.
 - **Search** — keyword search across everything captured, plus **Ask Orbit**: type a
   natural-language question ("what did Megan ask me to do in the last meeting?") and get a
   grounded answer with clickable citations back to the real source meeting(s).
@@ -49,10 +55,15 @@ phone-frame cockpit below ~700px viewport width, a sidebar-nav desktop layout at
   locally.
 
 Every AI-backed feature that costs a model call is **manual-trigger only** by design —
-nothing generates silently in the background. Nothing an LLM produces is ever
-auto-persisted; the only exceptions to "derived, not stored" are the per-stakeholder summary
-text itself and the raw meeting data — weekly reports, Today's Briefs, Ask Orbit answers, and
-both PDF exports are all generated fresh each time and never written to the database.
+nothing generates silently in the background; the suggested-commitment-updates feature rides
+the existing "Extract intelligence" action rather than adding a new trigger. Nothing an LLM
+produces is ever auto-persisted; the only exceptions to "derived, not stored" are the
+per-stakeholder summary text itself and the raw meeting data — weekly reports, Today's
+Briefs, Ask Orbit answers, and both PDF exports are all generated fresh each time and never
+written to the database. Accepted commitment suggestions don't add anything new to the
+database either — they write an ordinary progress-update entry against the commitment they
+refer to, exactly like one you'd log by hand. The meeting snapshot needs no model call at
+all — it's pure formatting of data already extracted.
 
 ## Deferred (by design)
 
@@ -119,17 +130,19 @@ Once connected, the release workflow is: branch → commit → push → merge to
 - **Data model** — two schemas (`shared.stakeholders`, `orbit.meetings`), unchanged since
   v1.4. `meetings` stores its extracted items (expectations, commitments — including their
   own nested progress-update audit trail — concerns, topics, decisions, action items, and the
-  raw transcript) as JSONB. No new tables since v1.4; new features have consistently extended
-  the existing JSONB shape additively rather than adding schema.
+  raw transcript) as JSONB. No new tables since v1.4; new features — including v1.12's
+  suggested commitment updates — have consistently extended the existing JSONB shape
+  additively rather than adding schema.
 - **One backend route, one AI provider.** `app/api/llm/route.ts` (server-only) proxies the
-  Anthropic Messages API for five tasks: extraction, per-stakeholder summary synthesis,
-  weekly report narration, Today's Brief priorities, and Ask Orbit's Q&A. Your API key never
+  Anthropic Messages API for five tasks: extraction (as of v1.12, also digesting your open
+  commitments and suggesting updates to them), per-stakeholder summary synthesis, weekly
+  report narration, Today's Brief priorities, and Ask Orbit's Q&A. Your API key never
   reaches the client. No other LLM provider is called anywhere in the app.
 - **Trust** — extraction is never auto-saved. The review step shows each item with the
   verbatim source line it came from; you confirm before it enters the knowledge base. This
-  extends to citations: when Ask Orbit points at a source meeting, the app re-resolves that
-  citation against real data before showing it as a link — never displays the model's own
-  restated text directly.
+  extends to citations: when Ask Orbit points at a source meeting, or a suggestion points at
+  an existing commitment (v1.12), the app re-resolves that reference against real data before
+  showing it — never displays or acts on the model's own restated text directly.
 - **PDF exports are entirely client-side** (`jspdf`, dynamically imported). No server
   involvement, no new backend surface. Meeting exports need no LLM call at all — they're pure
   formatting of data already loaded in the browser.
