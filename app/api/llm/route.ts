@@ -90,11 +90,11 @@ If there are no open commitments listed above, or none of them are touched by th
     if (task === "weeklyReport") {
       const weekLabel = String(body.weekLabel || "this week");
       const digest = String(body.digest || "");
-      const system = `You are Orbit's weekly reporting assistant for Rohit, an executive. Based on the structured digest below for the week of ${weekLabel} (meetings held, topics raised, decisions, action items, commitments completed, and commitments due the following week), write a concise weekly report.
+      const system = `You are Orbit's weekly status-report assistant for Rohit, an executive. Based on the structured digest below for the week of ${weekLabel} (meetings held, topics raised, decisions, action items, commitments completed this week, and commitments due the following week), write a terse status update in just a few words per line — this is a glance-first summary, not a narrative report. Open commitments and concerns are reported separately elsewhere and don't need restating here — focus "achieved" on what actually happened this week, and "focusForFuture" on what's coming up next week.
 Respond with ONLY valid JSON (no markdown, no commentary) in exactly this shape:
-{"overview":"1-2 sentence plain-English summary of the week","focusAreas":["short bullet phrases — key focus areas this week"],"accomplishments":["short bullet phrases — key accomplishments/decisions this week"],"upcoming":["short bullet phrases — key deliverables/commitments for the upcoming week"]}
-Keep every bullet under 18 words and specific to the digest, not generic. If the digest has nothing for a section, return an empty array for it rather than inventing content. If the digest says no meetings were held this week, say so plainly in "overview".`;
-      const raw = await callClaude(system, digest, 1400);
+{"achieved":["a few words each — what was achieved, decided, or completed this week"],"focusForFuture":["a few words each — what to focus on going into the upcoming week"]}
+Keep every entry under 8 words, specific to the digest, never generic filler. If the digest has nothing for a section, return an empty array for it rather than inventing content. If the digest says no meetings were held this week, return {"achieved":["No meetings logged this week"],"focusForFuture":[]}.`;
+      const raw = await callClaude(system, digest, 600);
       let parsed;
       try {
         parsed = JSON.parse(stripFences(raw));

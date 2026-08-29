@@ -101,11 +101,14 @@ export interface Extraction {
 
 // Generated on demand (not persisted) — consistent with Orbit's "derived, not stored"
 // intelligence model. See lib/utils.weeklyReportData + the "weeklyReport" LLM task.
+// v1.13: restructured to a terse 3-section status format (achieved / pending & concerns /
+// focus for future), replacing the earlier overview+focusAreas+accomplishments+upcoming
+// shape. Only the two narrative sections come from the model — "pending" and "openConcerns"
+// are rendered straight from WeeklyReportData (lib/utils.ts) with no LLM step at all, so
+// there's nothing there for the model to restate or get wrong (see master context §5).
 export interface WeeklyReport {
-  overview: string;
-  focusAreas: string[];
-  accomplishments: string[];
-  upcoming: string[];
+  achieved: string[];
+  focusForFuture: string[];
 }
 
 // Generated on demand (not persisted) — Home's "Today's Brief" section. Same derived-not-

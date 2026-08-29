@@ -4,11 +4,11 @@ import { useState } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, FileDown, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Eyebrow, SectionTitle, Spinner, vibrantCard } from "@/components/bits";
+import { DueLabel, Eyebrow, SectionTitle, Spinner, vibrantCard } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
 import {
-  cn, commitmentLabel, fmtFull, fmtWeekRange, startOfWeek, addDaysISO, todayISO, weeklyReportData,
+  cn, commitmentLabel, fmtFull, fmtWeekRange, startOfWeek, addDaysISO, todayISO, sanitizeForPdf, weeklyReportData,
 } from "@/lib/utils";
 import type { WeeklyReport } from "@/lib/types";
 
@@ -81,13 +81,13 @@ export function WeeklyReportScreen() {
       const addTitle = (text: string, size: number, gap: number) => {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(size);
-        doc.text(text, margin, y);
+        doc.text(sanitizeForPdf(text), margin, y);
         y += gap;
       };
       const addBody = (text: string, size = 11) => {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(size);
-        const lines = doc.splitTextToSize(text, width) as string[];
+        const lines = doc.splitTextToSize(sanitizeForPdf(text), width) as string[];
         lines.forEach((line) => {
           if (y > pageBottom) { doc.addPage(); y = margin; }
           doc.text(line, margin, y);
@@ -100,15 +100,30 @@ export function WeeklyReportScreen() {
         addTitle(heading, 13, 18);
         items.forEach((it) => addBody(`•  ${it}`));
       };
+      const addSubheading = (text: string) => addBody(text, 11.5);
 
-      addTitle("Orbit — Weekly report", 18, 26);
+      addTitle("Orbit — Weekly status report", 18, 26);
       addBody(weekLabel);
-      y += 6;
-      addTitle("Overview", 13, 18);
-      addBody(report.overview);
-      addSection("Key focus areas", report.focusAreas);
-      addSection("Key accomplishments", report.accomplishments);
-      addSection("Key deliverables — upcoming week", report.upcoming);
+
+      addSection("What was achieved", report.achieved);
+
+      // Pending commitments + open concerns are rendered straight from real data, never
+      // through the LLM — same "deterministic facts, nothing to restate" pattern Today's
+      // Brief's concerns already use (see master context §5).
+      y += 10;
+      addTitle("What was pending / open concerns", 13, 18);
+      addSubheading(data.pending.length ? "Pending commitments:" : "Pending commitments: none open.");
+      data.pending.forEach((c) => {
+        const due = c.dueDate ? `, due ${fmtFull(c.dueDate)}` : c.due ? `, due ${c.due}` : "";
+        addBody(`•  ${c.text} (${commitmentLabel(c, stakeholders)}${due})`);
+      });
+      y += 4;
+      addSubheading(data.openConcerns.length ? "Open concerns:" : "Open concerns: none raised this week.");
+      data.openConcerns.forEach(({ concern, meeting, recurring }) => {
+        addBody(`•  ${concern.text}${recurring ? " — raised again" : ""} (${meeting.title})`);
+      });
+
+      addSection("Focus for future", report.focusForFuture);
 
       doc.save(`orbit-weekly-report-${data.start}.pdf`);
     } finally {
@@ -123,7 +138,7 @@ export function WeeklyReportScreen() {
         <div className="text-[26px] font-bold tracking-tight">Weekly report</div>
       </div>
       <p className="mb-4 text-[13.5px] leading-relaxed text-muted-foreground">
-        What was covered this week, key focus areas, key accomplishments, and what&apos;s due next week — generated from your logged meetings.
+        A few-words status update for the week: what was achieved, what&apos;s pending or concerning, and what&apos;s next — generated from your logged meetings.
       </p>
 
       <div className="mb-4 flex items-center justify-between rounded-md border border-border bg-card px-3 py-2.5">
@@ -147,31 +162,62 @@ export function WeeklyReportScreen() {
 
       {report && (
         <>
-          <Card className={cn(vibrantCard, "mb-4 mt-4 bg-accent/40")}><CardContent>
-            <Eyebrow>Overview</Eyebrow>
-            <div className="mt-2 text-[15px] leading-relaxed">{report.overview}</div>
-          </CardContent></Card>
+          {report.achieved.length > 0 && (
+            <div className="mb-4 mt-4">
+              <SectionTitle>What was achieved</SectionTitle>
+              {report.achieved.map((t, i) => (
+                <Card key={i} className={cn(vibrantCard, "mb-2")}><CardContent className="text-[13.5px]">{t}</CardContent></Card>
+              ))}
+            </div>
+          )}
 
-          {report.focusAreas.length > 0 && (
+          <div className="mb-4">
+            <SectionTitle>What was pending / open concerns</SectionTitle>
+            <Eyebrow>Pending commitments</Eyebrow>
+            {data.pending.length === 0 ? (
+              <div className="mb-2 mt-1.5 text-[13px] text-muted-foreground">Nothing open right now.</div>
+            ) : (
+              <div className="mt-1.5">
+                {data.pending.map((c) => (
+                  <Card
+                    key={c.id}
+                    onClick={() => go({ screen: "meeting", id: c.meeting.id })}
+                    className={cn(vibrantCard, "mb-2 cursor-pointer")}
+                  ><CardContent>
+                    <DueLabel dueDate={c.dueDate} due={c.due} done={c.status === "done"} className="mb-1 block" />
+                    <div className="text-[13.5px] font-medium leading-snug">{c.text}</div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground/70">{commitmentLabel(c, stakeholders)}</div>
+                  </CardContent></Card>
+                ))}
+              </div>
+            )}
+
+            <Eyebrow>Open concerns</Eyebrow>
+            {data.openConcerns.length === 0 ? (
+              <div className="mt-1.5 text-[13px] text-muted-foreground">Nothing flagged this week.</div>
+            ) : (
+              <div className="mt-1.5">
+                {data.openConcerns.map(({ concern, meeting, recurring }) => (
+                  <Card
+                    key={concern.id}
+                    onClick={() => go({ screen: "meeting", id: meeting.id })}
+                    className={cn(vibrantCard, "mb-2 cursor-pointer")}
+                  ><CardContent>
+                    <div className="text-[13.5px] font-medium leading-snug">{concern.text}</div>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      {recurring && <span className="text-[11.5px] font-semibold text-warm">Raised again</span>}
+                      <span className="text-[11px] text-muted-foreground/70">{meeting.title} · {fmtFull(meeting.date)}</span>
+                    </div>
+                  </CardContent></Card>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {report.focusForFuture.length > 0 && (
             <div className="mb-4">
-              <SectionTitle>Key focus areas</SectionTitle>
-              {report.focusAreas.map((t, i) => (
-                <Card key={i} className={cn(vibrantCard, "mb-2")}><CardContent className="text-[13.5px]">{t}</CardContent></Card>
-              ))}
-            </div>
-          )}
-          {report.accomplishments.length > 0 && (
-            <div className="mb-4">
-              <SectionTitle>Key accomplishments</SectionTitle>
-              {report.accomplishments.map((t, i) => (
-                <Card key={i} className={cn(vibrantCard, "mb-2")}><CardContent className="text-[13.5px]">{t}</CardContent></Card>
-              ))}
-            </div>
-          )}
-          {report.upcoming.length > 0 && (
-            <div className="mb-4">
-              <SectionTitle>Key deliverables — upcoming week</SectionTitle>
-              {report.upcoming.map((t, i) => (
+              <SectionTitle>Focus for future</SectionTitle>
+              {report.focusForFuture.map((t, i) => (
                 <Card key={i} className={cn(vibrantCard, "mb-2")}><CardContent className="text-[13.5px]">{t}</CardContent></Card>
               ))}
             </div>
