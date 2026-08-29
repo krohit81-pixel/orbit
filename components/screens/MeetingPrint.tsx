@@ -6,27 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Eyebrow, Spinner } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
-import { commitmentLabel, fmtFull, isOverdue, partyName, recurringConcernIds, stakeholderById } from "@/lib/utils";
+import { commitmentLabel, fmtFull, isOverdue, partyName, recurringConcernIds, sanitizeForPdf, stakeholderById } from "@/lib/utils";
 import type { Meeting } from "@/lib/types";
-
-// jsPDF's built-in fonts (helvetica/times/courier) only support the WinAnsi/CP1252 byte
-// range. Most "smart" punctuation (em/en dash, curly quotes, ellipsis) is actually in that
-// range and renders fine — but arrows, checkmarks, and emoji are not. Feeding one of those in
-// doesn't just render as a wrong glyph: it corrupts jsPDF's width/kerning calculation for the
-// whole string it's in, which is what was producing the garbled "Commitments" section (lost
-// words, truncated dates, letter-spacing gone wrong) — the "->" this app writes itself was
-// fine, the "→" character was the actual cause. Applied to every string that reaches jsPDF,
-// including free-form text this app doesn't control (transcripts, summaries) that could
-// contain the same kind of character in a future meeting.
-function sanitizeForPdf(text: string): string {
-  return text
-    .replace(/[→⇒➔➜▶]/g, "->")
-    .replace(/[←⇐]/g, "<-")
-    .replace(/[↔⇔]/g, "<->")
-    .replace(/[✔✓☑]/g, "[x]")
-    .replace(/[✗✘☒]/g, "[ ]")
-    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ""); // emoji / dingbats — no WinAnsi mapping at all
-}
 
 interface PromptStats {
   overdueCommitments: number;
@@ -156,7 +137,7 @@ export function MeetingPrintScreen({ id }: { id: string }) {
       // Uniform field-labeled lines instead of prose sentences — every expectation/
       // commitment/concern follows the same "Field: value | Field: value | text" shape, so a
       // parser can treat each bullet as a row rather than having to extract meaning from a
-      // sentence. Plain "->" here, not the Unicode arrow — see sanitizeForPdf above.
+      // sentence. Plain "->" here, not the Unicode arrow — see sanitizeForPdf in lib/utils.ts.
       addSection(
         "Expectations",
         m.expectations.map((e) => {

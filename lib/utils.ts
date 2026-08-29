@@ -66,6 +66,16 @@ export function bucketDue(s?: string | null): DueBucket {
   if (diff <= 7) return "week";
   return "upcoming";
 }
+// Urgency ordering for bucketDue() results — most pressing first. Shared by todaysBriefData
+// (open commitments involving me) and weeklyReportData's "pending" list (v1.13) so both
+// surfaces sort urgency identically instead of each inventing its own order.
+const DUE_RANK: Record<DueBucket, number> = { overdue: 0, week: 1, upcoming: 2, undated: 3 };
+function sortByUrgency<T extends { dueDate?: string | null }>(items: T[]): T[] {
+  return items.slice().sort((a, b) => {
+    const r = DUE_RANK[bucketDue(a.dueDate)] - DUE_RANK[bucketDue(b.dueDate)];
+    return r !== 0 ? r : (a.dueDate || "9999").localeCompare(b.dueDate || "9999");
+  });
+}
 
 // Urgency bucket + short status word for the dashboard's open-commitments strip (v1.11).
 // Deliberately separate from bucketDue()/DueBucket above (which drive DueLabel and the
@@ -200,10 +210,32 @@ export function openCommitmentsDigest(meetings: Meeting[], stakeholders: Stakeho
     .join("\n");
 }
 
+// ---- pdf export ----
+// jsPDF's built-in fonts (helvetica/times/courier) only support the WinAnsi/CP1252 byte
+// range. Most "smart" punctuation (em/en dash, curly quotes, ellipsis) is actually in that
+// range and renders fine — but arrows, checkmarks, and emoji are not. Feeding one of those in
+// doesn't just render as a wrong glyph: it corrupts jsPDF's width/kerning calculation for the
+// whole string it's in (originally found via the "Commitments" section's "→" separator,
+// v1.10.2). Applied to every string that reaches jsPDF, including free-form text this app
+// doesn't control (transcripts, summaries, extracted concern/commitment text). Shared by
+// MeetingPrint.tsx and WeeklyReport.tsx (v1.13) rather than defined once per screen.
+export function sanitizeForPdf(text: string): string {
+  return text
+    .replace(/[→⇒➔➜▶]/g, "->")
+    .replace(/[←⇐]/g, "<-")
+    .replace(/[↔⇔]/g, "<->")
+    .replace(/[✔✓☑]/g, "[x]")
+    .replace(/[✗✘☒]/g, "[ ]")
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ""); // emoji / dingbats — no WinAnsi mapping at all
+}
+
 // ---- weekly report ----
-// Deterministic data assembly for a Monday-start week; the LLM only turns this into
+// Deterministic data assembly for a Monday-start week; the LLM only turns part of this into
 // prose (see the "weeklyReport" task in app/api/llm/route.ts) — the facts themselves
-// (which meetings, what topics, what's done, what's due) are computed here, not by the model.
+// (which meetings, what topics, what's done, what's due, what's pending, what's concerning)
+// are computed here, not by the model. As of v1.13, "pending" and "openConcerns" are rendered
+// directly from this data with no LLM involvement at all — same "deterministic facts, never
+// restated by the model" pattern Today's Brief's concerns already use (see master context §5).
 export interface WeeklyReportData {
   start: string;
   end: string;
@@ -212,7 +244,9 @@ export interface WeeklyReportData {
   decisions: string[];
   actionItems: string[];
   completed: Commitment[];
-  upcoming: OpenCommitment[];
+  upcoming: OpenCommitment[]; // my own commitments due the following week
+  pending: OpenCommitment[]; // v1.13: every currently open commitment involving me, most urgent first — the running backlog, not just this week's
+  openConcerns: BriefConcern[]; // v1.13: concerns raised within this specific week, recurring-first — same recurrence algorithm as todaysBriefData/recurringConcernIds
 }
 export function weeklyReportData(meetings: Meeting[], startISO: string): WeeklyReportData {
   const { start, end } = weekRange(startISO);
@@ -229,7 +263,42 @@ export function weeklyReportData(meetings: Meeting[], startISO: string): WeeklyR
   });
   const nextWeekEnd = addDaysISO(end, 7);
   const upcoming = myOpenCommitments(meetings).filter((c) => c.dueDate && c.dueDate > end && c.dueDate <= nextWeekEnd);
-  return { start, end, meetings: inWeek, topics: [...topics], decisions, actionItems, completed, upcoming };
+
+  // v1.13: overdue or due within the coming week — not the entire open backlog, which can
+  // span months or years and would defeat the "few words" brief a status report needs.
+  // Longer-horizon and undated commitments stay visible on Home/Stakeholder; this list is
+  // near-term accountability, not the full ledger. Reuses bucketDue's existing 7-day "week"
+  // window rather than inventing a third urgency bucket (see Design Decision #32).
+  const pending = sortByUrgency(
+    openCommitmentsInvolvingMe(meetings).filter((c) => {
+      const b = bucketDue(c.dueDate);
+      return b === "overdue" || b === "week";
+    })
+  );
+
+  // v1.13: concerns raised specifically within this week, recurring-first — same walk-the-
+  // full-history-ascending recurrence algorithm as todaysBriefData (v1.9.1's fix: check each
+  // meeting's concerns against `seen` before adding that meeting's own concerns to it, so a
+  // meeting never gets flagged against itself), just filtered to this week's date range
+  // instead of a rolling window.
+  const asc = meetings.slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const seenConcernTexts: string[] = [];
+  const openConcerns: BriefConcern[] = [];
+  asc.forEach((m) => {
+    const thisMeetingsTexts: string[] = [];
+    m.concerns.forEach((c) => {
+      const recurring = seenConcernTexts.some((s) => similar(s, c.text));
+      if (m.date >= start && m.date <= end) openConcerns.push({ concern: c, meeting: m, recurring });
+      thisMeetingsTexts.push(c.text);
+    });
+    seenConcernTexts.push(...thisMeetingsTexts);
+  });
+  openConcerns.sort((a, b) => {
+    if (a.recurring !== b.recurring) return a.recurring ? -1 : 1;
+    return (b.meeting.date || "").localeCompare(a.meeting.date || "");
+  });
+
+  return { start, end, meetings: inWeek, topics: [...topics], decisions, actionItems, completed, upcoming, pending, openConcerns };
 }
 
 // Which of one specific meeting's own concerns are recurring (i.e. similar() to a concern
@@ -267,14 +336,8 @@ export interface TodaysBriefData {
   expectations: { e: Expectation; meeting: Meeting }[]; // open, from meetings within the window
   recentMeetings: Meeting[]; // within the window, for narrative context
 }
-const DUE_RANK: Record<DueBucket, number> = { overdue: 0, week: 1, upcoming: 2, undated: 3 };
 export function todaysBriefData(meetings: Meeting[], windowDays = 30): TodaysBriefData {
-  const commitments = openCommitmentsInvolvingMe(meetings)
-    .slice()
-    .sort((a, b) => {
-      const r = DUE_RANK[bucketDue(a.dueDate)] - DUE_RANK[bucketDue(b.dueDate)];
-      return r !== 0 ? r : (a.dueDate || "9999").localeCompare(b.dueDate || "9999");
-    });
+  const commitments = sortByUrgency(openCommitmentsInvolvingMe(meetings));
 
   const cutoff = addDaysISO(todayISO(), -windowDays);
   const recentMeetings = meetings
