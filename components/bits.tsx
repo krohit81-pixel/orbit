@@ -1,7 +1,7 @@
 import { ArrowDownLeft, ArrowUpRight, Quote, Star, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  bucketDue, dueTileInfo, fmtDate, fmtFull, fmtWeekdayShort, tileCounterparty,
+  bucketDue, dueTileInfo, fmtDate, fmtFull, fmtWeekdayShort, shortLabel, tileCounterparty,
   type OpenCommitment, type TileBucket, type WeekGanttData,
 } from "@/lib/utils";
 import type { Stakeholder } from "@/lib/types";
@@ -54,9 +54,10 @@ export function DueLabel({ dueDate, due, done, className }: { dueDate?: string |
 // Bg-only half of the mapping, exported so MeetingSnapshot's commitment-status dots (v1.12)
 // use exactly the same red/amber/green background tokens as these tiles — one source of
 // truth for the color, rather than a second mapping (or string-parsing this one) that could
-// drift from it. TILE_BUCKET_FG is the matching foreground-only half, split out in v1.14.1 so
-// WeekGantt's in-bar date label can use just the text color without pulling in a bg it
-// already has from TILE_BUCKET_BG. STRIP_TILE_CLASS combines both for CommitmentStrip's tiles.
+// drift from it. TILE_BUCKET_FG is the matching "readable on a solid fill" foreground half
+// (white-ish `*-foreground` tokens) — STRIP_TILE_CLASS combines both for CommitmentStrip's
+// solid-fill tiles. WeekGantt's outlined bars (v1.14.3) want the colored text itself, not the
+// on-fill foreground, so they use their own GANTT_BAR_CLASS below instead of this pair.
 export const TILE_BUCKET_BG: Record<TileBucket, string> = {
   overdue: "bg-warm",
   soon: "bg-caution",
@@ -133,6 +134,19 @@ export function CommitmentStrip({
 // them, same-color/same-length bars just read as an undifferentiated stack. The gridlines
 // let a bar's start/end still be read against the header even when color and length don't
 // vary between rows.
+//
+// v1.14.3: bars are a thick colored outline over a light tint of the same color, not a solid
+// fill — a deliberate, lighter-weight treatment for this widget specifically (CommitmentStrip's
+// tiles and MeetingSnapshot's dots keep their existing solid fill; this isn't a site-wide
+// palette change, just this component's own look). Border/text share the bucket's own color
+// token; the fill is that same token at low opacity, so it stays recognizably "the same red"
+// without competing visually with the (also full-color) tiles above it.
+const GANTT_BAR_CLASS: Record<TileBucket, string> = {
+  overdue: "border-warm bg-warm/10 text-warm",
+  soon: "border-caution bg-caution/10 text-caution",
+  later: "border-success bg-success/10 text-success",
+  undated: "border-border bg-secondary/60 text-muted-foreground",
+};
 export function WeekGantt({
   data, stakeholders, onSelect,
 }: {
@@ -173,17 +187,21 @@ export function WeekGantt({
                   <span className="truncate">{name}</span>
                 </span>
                 <span
-                  className={cn("flex h-5 items-center justify-end overflow-hidden rounded-full px-1.5 shadow-sm", TILE_BUCKET_BG[row.bucket])}
+                  className={cn("flex h-5 min-w-0 items-center overflow-hidden rounded-full border-2 px-1.5", GANTT_BAR_CLASS[row.bucket])}
                   style={{ gridColumn: `${row.startCol + 2} / ${row.endCol + 3}` }}
                   title={row.commitment.text}
                 >
-                  {/* Only shown when the bar spans 2+ days — a single-day bar has no room for
-                      text and is already unambiguous from its column position under the
-                      header. Same day-number formatting as the header, so the two read as
-                      one system rather than two different date styles. */}
+                  {/* A short, real-text "what this is about" label (v1.14.2) — not the due
+                      date (that's already readable from the bar's position against the
+                      header). Only shown when the bar spans 2+ days: a single-day bar has no
+                      room for even a couple of words, and forcing text in would either
+                      overflow or need type too small to read. `truncate` + `min-w-0` on the
+                      parent guarantee the label is clipped with an ellipsis rather than ever
+                      pushing past the bar's own rounded edge, for narrower multi-day bars
+                      too (e.g. a commitment whose due date lands mid-week). */}
                   {row.endCol > row.startCol && (
-                    <span className={cn("truncate text-[9px] font-bold leading-none", TILE_BUCKET_FG[row.bucket])}>
-                      {fmtDate(row.commitment.dueDate)?.split(" ")[0]}
+                    <span className="truncate text-[9px] font-semibold leading-none">
+                      {shortLabel(row.commitment.text)}
                     </span>
                   )}
                 </span>

@@ -132,6 +132,20 @@ export function HomeScreen() {
     <div>
       <h1 className="mb-4 mt-1 text-[26px] font-bold leading-tight tracking-tight">What needs your attention</h1>
 
+      {/* This week (v1.14) — sits above Today's Brief, deliberately independent of it: no LLM
+          call, no "generate" gate, renders live straight from weekGanttData() every time Home
+          mounts. */}
+      <div className={cn(vibrantCard, "mb-[18px] rounded-md px-3.5 py-3.5")}>
+        <div className="mb-2.5 flex items-center gap-1.5 text-[13px] font-bold tracking-tight text-foreground">
+          <CalendarDays className="h-4 w-4 text-primary" /> This week
+        </div>
+        {gantt.rows.length === 0 ? (
+          <div className="text-[13px] text-muted-foreground">Nothing due or overdue in the next 7 days.</div>
+        ) : (
+          <WeekGantt data={gantt} stakeholders={stakeholders} onSelect={(meetingId) => go({ screen: "meeting", id: meetingId })} />
+        )}
+      </div>
+
       {meetings.length > 0 && (
         <div className={cn(vibrantCard, "mb-[18px] rounded-md bg-accent/40")}>
           <div className="flex items-center justify-between px-3.5 pt-3">
@@ -229,21 +243,6 @@ export function HomeScreen() {
           )}
         </div>
       )}
-
-      {/* This week (v1.14) — a rolling 7-day timeline, additive to Today's Brief above rather
-          than replacing its tile grid (a deliberate, narrower answer than swapping the two
-          out). No LLM call, no "generate" gate — deterministic, so it just renders live like
-          the tiles do, straight from weekGanttData(). */}
-      <div className={cn(vibrantCard, "mb-[18px] rounded-md px-3.5 py-3.5")}>
-        <div className="mb-2.5 flex items-center gap-1.5 text-[13px] font-bold tracking-tight text-foreground">
-          <CalendarDays className="h-4 w-4 text-primary" /> This week
-        </div>
-        {gantt.rows.length === 0 ? (
-          <div className="text-[13px] text-muted-foreground">Nothing due or overdue in the next 7 days.</div>
-        ) : (
-          <WeekGantt data={gantt} stakeholders={stakeholders} onSelect={(meetingId) => go({ screen: "meeting", id: meetingId })} />
-        )}
-      </div>
 
       <button
         onClick={() => go({ screen: "search" })}
