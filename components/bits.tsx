@@ -1,6 +1,9 @@
 import { ArrowDownLeft, ArrowUpRight, Quote, Star, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { bucketDue, dueTileInfo, fmtFull, tileCounterparty, type OpenCommitment, type TileBucket } from "@/lib/utils";
+import {
+  bucketDue, dueTileInfo, fmtDate, fmtFull, fmtWeekdayShort, tileCounterparty,
+  type OpenCommitment, type TileBucket, type WeekGanttData,
+} from "@/lib/utils";
 import type { Stakeholder } from "@/lib/types";
 import type { Theme } from "@/components/ThemeProvider";
 
@@ -51,18 +54,26 @@ export function DueLabel({ dueDate, due, done, className }: { dueDate?: string |
 // Bg-only half of the mapping, exported so MeetingSnapshot's commitment-status dots (v1.12)
 // use exactly the same red/amber/green background tokens as these tiles — one source of
 // truth for the color, rather than a second mapping (or string-parsing this one) that could
-// drift from it. STRIP_TILE_CLASS below just adds each bucket's foreground text color.
+// drift from it. TILE_BUCKET_FG is the matching foreground-only half, split out in v1.14.1 so
+// WeekGantt's in-bar date label can use just the text color without pulling in a bg it
+// already has from TILE_BUCKET_BG. STRIP_TILE_CLASS combines both for CommitmentStrip's tiles.
 export const TILE_BUCKET_BG: Record<TileBucket, string> = {
   overdue: "bg-warm",
   soon: "bg-caution",
   later: "bg-success",
   undated: "bg-secondary",
 };
+export const TILE_BUCKET_FG: Record<TileBucket, string> = {
+  overdue: "text-warm-foreground",
+  soon: "text-caution-foreground",
+  later: "text-success-foreground",
+  undated: "text-secondary-foreground",
+};
 const STRIP_TILE_CLASS: Record<TileBucket, string> = {
-  overdue: `${TILE_BUCKET_BG.overdue} text-warm-foreground`,
-  soon: `${TILE_BUCKET_BG.soon} text-caution-foreground`,
-  later: `${TILE_BUCKET_BG.later} text-success-foreground`,
-  undated: `${TILE_BUCKET_BG.undated} text-secondary-foreground`,
+  overdue: `${TILE_BUCKET_BG.overdue} ${TILE_BUCKET_FG.overdue}`,
+  soon: `${TILE_BUCKET_BG.soon} ${TILE_BUCKET_FG.soon}`,
+  later: `${TILE_BUCKET_BG.later} ${TILE_BUCKET_FG.later}`,
+  undated: `${TILE_BUCKET_BG.undated} ${TILE_BUCKET_FG.undated}`,
 };
 
 export function CommitmentStrip({
@@ -101,6 +112,86 @@ export function CommitmentStrip({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+// Rolling 7-day "shape of the week" timeline (v1.14) — one row per open commitment due or
+// overdue within the window (see weekGanttData()), a bar spanning meeting-date -> due-date,
+// clamped into the 7 visible day columns. A fixed-width label column (direction arrow +
+// counterparty name, reusing tileCounterparty() exactly like CommitmentStrip) sits to the
+// left of the 7-column grid; the bar itself carries no text — labels stay legible at any
+// screen width instead of trying to fit inside a possibly one-day-wide bar. Colored via the
+// same TILE_BUCKET_BG tokens the tiles above it and MeetingSnapshot's dots already use, so
+// red/amber/green means the same thing everywhere in the app. Read-only: tapping a row
+// navigates to its source meeting, the same interaction as every other card/tile on Home —
+// dragging to reschedule would bypass the commitment audit trail (see CommitmentUpdates).
+//
+// A faint day-column grid (v1.14.1) sits behind the bars, with "today" getting its own soft
+// tint + left edge. Real usage showed several commitments often share the same due date and
+// bucket (e.g. a batch all resolved to "by Friday" from one meeting) — with nothing behind
+// them, same-color/same-length bars just read as an undifferentiated stack. The gridlines
+// let a bar's start/end still be read against the header even when color and length don't
+// vary between rows.
+export function WeekGantt({
+  data, stakeholders, onSelect,
+}: {
+  data: WeekGanttData;
+  stakeholders: Stakeholder[];
+  onSelect: (meetingId: string) => void;
+}) {
+  if (data.rows.length === 0) return null;
+  return (
+    <div>
+      <div className="mb-1.5 grid grid-cols-[68px_repeat(7,1fr)] gap-1">
+        <div />
+        {data.days.map((d, i) => (
+          <div key={d} className={cn("text-center", i === 0 && "text-primary")}>
+            <div className="text-[9.5px] font-semibold uppercase tracking-[0.04em] opacity-70">{fmtWeekdayShort(d)}</div>
+            <div className="text-[11px] font-bold">{fmtDate(d)?.split(" ")[0]}</div>
+          </div>
+        ))}
+      </div>
+      <div className="relative">
+        <div className="pointer-events-none absolute inset-y-0 left-[68px] right-0 grid grid-cols-7 divide-x divide-border/60">
+          {data.days.map((d, i) => (
+            <div key={d} className={i === 0 ? "border-l-2 border-l-primary/40 bg-primary/[0.06]" : undefined} />
+          ))}
+        </div>
+        <div className="relative space-y-1 py-0.5">
+          {data.rows.map((row) => {
+            const { name, direction } = tileCounterparty(row.commitment, stakeholders);
+            return (
+              <button
+                key={row.commitment.id}
+                onClick={() => onSelect(row.commitment.meeting.id)}
+                className="grid w-full grid-cols-[68px_repeat(7,1fr)] items-center gap-1 rounded-md py-0.5 text-left hover:bg-secondary/50"
+              >
+                <span className="flex items-center gap-0.5 truncate text-[11px] font-medium">
+                  {direction === "out" && <ArrowUpRight className="h-3 w-3 shrink-0 text-muted-foreground/60" aria-label="You owe" />}
+                  {direction === "in" && <ArrowDownLeft className="h-3 w-3 shrink-0 text-muted-foreground/60" aria-label="Owed to you" />}
+                  <span className="truncate">{name}</span>
+                </span>
+                <span
+                  className={cn("flex h-5 items-center justify-end overflow-hidden rounded-full px-1.5 shadow-sm", TILE_BUCKET_BG[row.bucket])}
+                  style={{ gridColumn: `${row.startCol + 2} / ${row.endCol + 3}` }}
+                  title={row.commitment.text}
+                >
+                  {/* Only shown when the bar spans 2+ days — a single-day bar has no room for
+                      text and is already unambiguous from its column position under the
+                      header. Same day-number formatting as the header, so the two read as
+                      one system rather than two different date styles. */}
+                  {row.endCol > row.startCol && (
+                    <span className={cn("truncate text-[9px] font-bold leading-none", TILE_BUCKET_FG[row.bucket])}>
+                      {fmtDate(row.commitment.dueDate)?.split(" ")[0]}
+                    </span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
