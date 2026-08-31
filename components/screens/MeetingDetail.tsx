@@ -12,7 +12,7 @@ import { useFlow } from "@/components/flow";
 import { cn, fmtFull, stakeholderById, commitmentLabel } from "@/lib/utils";
 
 export function MeetingScreen({ id }: { id: string }) {
-  const { meetings, stakeholders, toggleCommitment } = useOrbit();
+  const { meetings, stakeholders, toggleCommitment, resolveConcern, reopenConcern } = useOrbit();
   const { go } = useFlow();
   const [showTranscript, setShowTranscript] = useState(false);
   const [pending, setPending] = useState<Set<string>>(new Set());
@@ -25,6 +25,24 @@ export function MeetingScreen({ id }: { id: string }) {
       await toggleCommitment(m.id, commId);
     } finally {
       setPending((p) => { const next = new Set(p); next.delete(commId); return next; });
+    }
+  };
+
+  const doResolveConcern = async (concernId: string, resolution: "mitigated" | "no_longer_relevant") => {
+    setPending((p) => new Set(p).add(concernId));
+    try {
+      await resolveConcern(m.id, concernId, resolution);
+    } finally {
+      setPending((p) => { const next = new Set(p); next.delete(concernId); return next; });
+    }
+  };
+
+  const doReopenConcern = async (concernId: string) => {
+    setPending((p) => new Set(p).add(concernId));
+    try {
+      await reopenConcern(m.id, concernId);
+    } finally {
+      setPending((p) => { const next = new Set(p); next.delete(concernId); return next; });
     }
   };
 
@@ -107,12 +125,54 @@ export function MeetingScreen({ id }: { id: string }) {
       {m.concerns.length > 0 && (
         <div className="mb-[18px]">
           <SectionTitle>Concerns</SectionTitle>
-          {m.concerns.map((e) => (
-            <Card key={e.id} className={cn(vibrantCard, "mb-2.5")}><CardContent>
-              <div className="font-semibold">{e.text}</div>
-              <SourceQuote>{e.source}</SourceQuote>
-            </CardContent></Card>
-          ))}
+          {m.concerns.map((e) => {
+            const resolved = e.status === "resolved";
+            const busy = pending.has(e.id);
+            return (
+              <Card key={e.id} className={cn(vibrantCard, "mb-2.5")}><CardContent>
+                <div className="flex items-start justify-between gap-2">
+                  <div className={cn("font-semibold", resolved && "text-muted-foreground/60 line-through")}>{e.text}</div>
+                  {resolved && (
+                    <Badge variant="default" className="shrink-0">
+                      {e.resolution === "mitigated" ? "Mitigated" : "No longer a concern"}
+                    </Badge>
+                  )}
+                </div>
+                <SourceQuote>{e.source}</SourceQuote>
+                {/* Buried, not deleted (v1.17): resolving drops it from Today's Brief, the
+                    weekly report's open concerns, and relationship-health scoring, but it
+                    stays here on the meeting record — still visible, still searchable — in
+                    case it's worth looking back at. Reopen undoes it in one tap. */}
+                {resolved ? (
+                  <button
+                    onClick={() => doReopenConcern(e.id)}
+                    disabled={busy}
+                    className="mt-2 flex items-center gap-1.5 text-[12px] font-semibold text-primary disabled:opacity-50"
+                  >
+                    {busy ? <Spinner className="h-3.5 w-3.5" /> : null} Reopen
+                  </button>
+                ) : (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <button
+                      onClick={() => doResolveConcern(e.id, "mitigated")}
+                      disabled={busy}
+                      className="rounded-md border border-border px-2.5 py-1 text-[12px] font-semibold text-muted-foreground hover:border-success hover:text-success disabled:opacity-50"
+                    >
+                      Mitigated
+                    </button>
+                    <button
+                      onClick={() => doResolveConcern(e.id, "no_longer_relevant")}
+                      disabled={busy}
+                      className="rounded-md border border-border px-2.5 py-1 text-[12px] font-semibold text-muted-foreground hover:border-success hover:text-success disabled:opacity-50"
+                    >
+                      No longer a concern
+                    </button>
+                    {busy && <Spinner className="h-4 w-4 self-center text-muted-foreground/60" />}
+                  </div>
+                )}
+              </CardContent></Card>
+            );
+          })}
         </div>
       )}
 

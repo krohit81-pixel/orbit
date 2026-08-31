@@ -150,10 +150,10 @@ export function StakeholderScreen({ id }: { id: string }) {
                 <div key={e.id} className="text-[12.5px] text-muted-foreground"><span className="font-semibold text-foreground">Expects:</span> {e.text}</div>
               ))}
               {st.freshConcerns.map((cn) => (
-                <div key={cn.id} className="text-[12.5px] text-muted-foreground"><span className="font-semibold text-warm">New concern:</span> {cn.text}</div>
+                <div key={cn.id} className="text-[12.5px] text-muted-foreground"><span className="font-semibold text-warm">New concern:</span> {cn.text}{cn.status === "resolved" ? ` · ${cn.resolution === "mitigated" ? "mitigated" : "no longer a concern"}` : ""}</div>
               ))}
               {st.recurringConcerns.map((cn) => (
-                <div key={cn.id} className="text-[12.5px] text-muted-foreground"><span className="font-semibold text-warm">Raised again:</span> {cn.text}</div>
+                <div key={cn.id} className="text-[12.5px] text-muted-foreground"><span className="font-semibold text-warm">Raised again:</span> {cn.text}{cn.status === "resolved" ? ` · ${cn.resolution === "mitigated" ? "mitigated" : "no longer a concern"}` : ""}</div>
               ))}
               {st.youCommitted.map((cm) => (
                 <div key={cm.id} className="text-[12.5px] text-muted-foreground">

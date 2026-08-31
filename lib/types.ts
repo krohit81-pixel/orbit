@@ -51,11 +51,19 @@ export interface Commitment {
   updates?: CommitmentUpdate[]; // progress/audit log — additive, optional (v1.8)
 }
 
+// v1.17: status/resolution are additive to the existing JSONB shape (no migration) — same
+// "old records simply lack the field" backward-compat pattern as Commitment.status before it
+// (see normConcern(), lib/db.ts). A resolved concern is never deleted: it's buried on the
+// meeting record (still visible, still searchable) but drops out of every "what's currently
+// live" surface — Today's Brief, the weekly report's open concerns, and relationship-health
+// scoring — the same "open" vs "done" split Commitment already has, just for concerns.
 export interface Concern {
   id: string;
   text: string;
   stakeholderId: string | null;
   source?: string;
+  status: "open" | "resolved";
+  resolution?: "mitigated" | "no_longer_relevant"; // only set once resolved; cleared on reopen
 }
 
 export interface Meeting {

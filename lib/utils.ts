@@ -428,7 +428,9 @@ export function weeklyReportData(meetings: Meeting[], startISO: string): WeeklyR
     const thisMeetingsTexts: string[] = [];
     m.concerns.forEach((c) => {
       const recurring = seenConcernTexts.some((s) => similar(s, c.text));
-      if (m.date >= start && m.date <= end) openConcerns.push({ concern: c, meeting: m, recurring });
+      // Resolved (v1.17) means buried, not gone — still counts for "raised again" detection,
+      // but no longer belongs in the "open concerns" section of the report.
+      if (m.date >= start && m.date <= end && c.status !== "resolved") openConcerns.push({ concern: c, meeting: m, recurring });
       thisMeetingsTexts.push(c.text);
     });
     seenConcernTexts.push(...thisMeetingsTexts);
@@ -502,7 +504,10 @@ export function todaysBriefData(meetings: Meeting[], windowDays = 30): TodaysBri
     const thisMeetingsTexts: string[] = [];
     m.concerns.forEach((c) => {
       const recurring = seen.some((s) => similar(s, c.text));
-      if (m.date >= cutoff) concerns.push({ concern: c, meeting: m, recurring });
+      // A resolved concern (v1.17) is buried, not deleted — it still counts toward "raised
+      // again" detection for other concerns (a topic resolved once can genuinely recur), but
+      // it no longer belongs in the brief itself: that's the entire point of resolving it.
+      if (m.date >= cutoff && c.status !== "resolved") concerns.push({ concern: c, meeting: m, recurring });
       thisMeetingsTexts.push(c.text);
     });
     seen.push(...thisMeetingsTexts);
@@ -660,7 +665,10 @@ export function relationshipHealth(meetings: Meeting[], sid: string): Relationsh
   }
   const steps = trajectory(meetings, sid);
   const overdueCount = [...it.youOwe, ...it.owesYou].filter((c) => isOverdue(c.dueDate)).length;
-  const recurringConcernCount = steps.reduce((sum, st) => sum + st.recurringConcerns.length, 0);
+  // Resolved concerns (v1.17) shouldn't keep dragging the star rating down forever — that's
+  // the whole point of resolving one. The trajectory view itself still shows every concern,
+  // resolved or not, as an honest historical record; only the score's inputs are filtered.
+  const recurringConcernCount = steps.reduce((sum, st) => sum + st.recurringConcerns.filter((c) => c.status !== "resolved").length, 0);
   const lastDate = it.interactions[0]?.date ?? null;
   const daysSinceLastInteraction = lastDate
     ? Math.round((Date.now() - new Date(lastDate + "T00:00:00").getTime()) / 86400000)

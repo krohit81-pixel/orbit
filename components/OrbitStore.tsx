@@ -23,6 +23,8 @@ interface OrbitContextValue {
   saveMeeting: (m: Meeting) => Promise<void>;
   deleteMeeting: (id: string) => Promise<void>;
   toggleCommitment: (meetingId: string, commId: string) => Promise<void>;
+  resolveConcern: (meetingId: string, concernId: string, resolution: "mitigated" | "no_longer_relevant") => Promise<void>;
+  reopenConcern: (meetingId: string, concernId: string) => Promise<void>;
   addCommitmentUpdate: (meetingId: string, commId: string, input: { note: string; date: string; newDueDate?: string | null; markDone?: boolean }) => Promise<void>;
   setSummary: (sid: string, summary: string) => Promise<void>;
   commitSchedule: (items: ScheduleReviewItem[]) => Promise<void>;
@@ -94,7 +96,7 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
       mentioned: review.people.filter((p) => p.include).map((p) => resolve(p.name)).filter((x): x is string => !!x),
       expectations: review.expectations.filter((e) => e.include).map((e) => ({ id: uid(), text: e.text, stakeholderId: resolve(e.stakeholder), source: e.source, status: "open" as const })),
       commitments: review.commitments.filter((e) => e.include).map((e) => ({ id: uid(), text: e.text, ownerId: resolveParty(e.owner), owedToId: resolveParty(e.owedTo), due: e.due, dueDate: e.dueDate ?? null, source: e.source, status: "open" as const })),
-      concerns: review.concerns.filter((e) => e.include).map((e) => ({ id: uid(), text: e.text, stakeholderId: resolve(e.stakeholder), source: e.source })),
+      concerns: review.concerns.filter((e) => e.include).map((e) => ({ id: uid(), text: e.text, stakeholderId: resolve(e.stakeholder), source: e.source, status: "open" as const })),
       decisions: review.decisions,
       actionItems: review.actionItems,
       transcript: review.transcript || undefined,
@@ -171,6 +173,52 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
       // DB write failed (e.g. RLS policy) — roll back the optimistic toggle so the UI
       // doesn't show a "done" state that never actually saved.
       setMeetings((prev) => prev.map((m) => (m.id === meetingId && prevCommitments ? { ...m, commitments: prevCommitments } : m)));
+      const msg = e instanceof Error ? e.message : "Could not save this change.";
+      if (typeof window !== "undefined") window.alert(`Couldn't save: ${msg}\nYour change was not saved — please try again.`);
+    }
+  }, []);
+
+  // Buries a concern (v1.17): drops it from every "currently live" surface — Today's Brief,
+  // the weekly report's open concerns, relationship-health scoring — without deleting it. It
+  // stays on the meeting record, still searchable, still visible there with its resolution
+  // reason shown, same "open" -> "done" shape as toggleCommitment above, just with a reason
+  // attached and (below) a way back.
+  const resolveConcern = useCallback(async (meetingId: string, concernId: string, resolution: "mitigated" | "no_longer_relevant") => {
+    let prevConcerns: Meeting["concerns"] | null = null;
+    let nextConcerns: Meeting["concerns"] | null = null;
+    setMeetings((prev) => prev.map((m) => {
+      if (m.id !== meetingId) return m;
+      prevConcerns = m.concerns;
+      const concerns = m.concerns.map((c) => (c.id === concernId ? { ...c, status: "resolved" as const, resolution } : c));
+      nextConcerns = concerns;
+      return { ...m, concerns };
+    }));
+    if (!nextConcerns) return;
+    try {
+      await db.updateMeeting(meetingId, { concerns: nextConcerns });
+    } catch (e) {
+      setMeetings((prev) => prev.map((m) => (m.id === meetingId && prevConcerns ? { ...m, concerns: prevConcerns } : m)));
+      const msg = e instanceof Error ? e.message : "Could not save this change.";
+      if (typeof window !== "undefined") window.alert(`Couldn't save: ${msg}\nYour change was not saved — please try again.`);
+    }
+  }, []);
+
+  // Undoes a resolve — back to "open" everywhere, resolution reason cleared.
+  const reopenConcern = useCallback(async (meetingId: string, concernId: string) => {
+    let prevConcerns: Meeting["concerns"] | null = null;
+    let nextConcerns: Meeting["concerns"] | null = null;
+    setMeetings((prev) => prev.map((m) => {
+      if (m.id !== meetingId) return m;
+      prevConcerns = m.concerns;
+      const concerns = m.concerns.map((c) => (c.id === concernId ? { ...c, status: "open" as const, resolution: undefined } : c));
+      nextConcerns = concerns;
+      return { ...m, concerns };
+    }));
+    if (!nextConcerns) return;
+    try {
+      await db.updateMeeting(meetingId, { concerns: nextConcerns });
+    } catch (e) {
+      setMeetings((prev) => prev.map((m) => (m.id === meetingId && prevConcerns ? { ...m, concerns: prevConcerns } : m)));
       const msg = e instanceof Error ? e.message : "Could not save this change.";
       if (typeof window !== "undefined") window.alert(`Couldn't save: ${msg}\nYour change was not saved — please try again.`);
     }
@@ -350,7 +398,7 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
   const value: OrbitContextValue = {
     ready, configured: supabaseConfigured, error, self: { name: "Rohit" },
     stakeholders, meetings, upcomingMeetings, pendingMeetingReviews, refresh, addStakeholder, saveStakeholder, deleteStakeholder,
-    commitMeeting, saveMeeting, deleteMeeting, toggleCommitment, addCommitmentUpdate, setSummary,
+    commitMeeting, saveMeeting, deleteMeeting, toggleCommitment, resolveConcern, reopenConcern, addCommitmentUpdate, setSummary,
     commitSchedule, saveUpcomingMeetingNotes, deleteUpcomingMeeting, deletePendingMeetingReview,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

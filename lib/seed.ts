@@ -31,7 +31,7 @@ export function seedData(): SeedData {
       topics: ["Risk governance", "Board readiness"], mentioned: [s1],
       expectations: [],
       commitments: [],
-      concerns: [{ id: uid(), text: "Governance clarity is thin right now", stakeholderId: s1, source: "I'm not sure the governance story holds up" }],
+      concerns: [{ id: uid(), text: "Governance clarity is thin right now", stakeholderId: s1, source: "I'm not sure the governance story holds up", status: "open" }],
       decisions: [], actionItems: [],
     },
     {
@@ -40,7 +40,7 @@ export function seedData(): SeedData {
       topics: ["Risk governance", "Board readiness", "Execution"], mentioned: [s1],
       expectations: [{ id: uid(), text: "A clear risk-appetite summary for the board", stakeholderId: s1, source: "the board wants the risk picture in one page", status: "open" }],
       commitments: [{ id: uid(), text: "Share risk-appetite summary", ownerId: "me", owedToId: s1, due: "This week", dueDate: isoIn(4), source: "I'll get you the one-pager", status: "open" }],
-      concerns: [{ id: uid(), text: "Governance keeps slipping; can't happen again", stakeholderId: s1, source: "we can't slip again on this" }],
+      concerns: [{ id: uid(), text: "Governance keeps slipping; can't happen again", stakeholderId: s1, source: "we can't slip again on this", status: "open" }],
       decisions: ["Risk-appetite summary precedes the board pack"], actionItems: ["Draft one-page risk appetite"],
     },
     {
@@ -49,7 +49,7 @@ export function seedData(): SeedData {
       topics: ["AI governance", "Board readiness", "Hiring"], mentioned: [s1],
       expectations: [{ id: uid(), text: "AI governance proposal finalised before quarter-end", stakeholderId: s1, source: "I need the governance proposal finalised", status: "open" }],
       commitments: [{ id: uid(), text: "Deliver AI governance proposal", ownerId: "me", owedToId: s1, due: "By the 30th", dueDate: isoIn(15), source: "I'll get you the proposal by the 30th", status: "open" }],
-      concerns: [{ id: uid(), text: "Board scrutiny on governance is rising", stakeholderId: s1, source: "the board is asking hard questions now" }],
+      concerns: [{ id: uid(), text: "Board scrutiny on governance is rising", stakeholderId: s1, source: "the board is asking hard questions now", status: "open" }],
       decisions: ["Governance proposal prioritised first, hiring roadmap second"], actionItems: [],
     },
     {
@@ -58,7 +58,7 @@ export function seedData(): SeedData {
       topics: ["Platform stability", "Hiring", "Delivery timelines"], mentioned: [s2],
       expectations: [{ id: uid(), text: "A staffing plan for the platform team", stakeholderId: s2, source: "give me a plan before we commit dates", status: "open" }],
       commitments: [],
-      concerns: [{ id: uid(), text: "Dates are unrealistic without headcount", stakeholderId: s2, source: "we're blocked until hiring picks up" }],
+      concerns: [{ id: uid(), text: "Dates are unrealistic without headcount", stakeholderId: s2, source: "we're blocked until hiring picks up", status: "open" }],
       decisions: [], actionItems: ["Map open platform roles"],
     },
   ];

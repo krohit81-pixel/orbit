@@ -1,6 +1,6 @@
 import { supabase } from "./supabase/client";
 import { seedData } from "./seed";
-import type { Commitment, Extraction, Meeting, PendingMeetingReview, Stakeholder, UpcomingMeeting } from "./types";
+import type { Commitment, Concern, Extraction, Meeting, PendingMeetingReview, Stakeholder, UpcomingMeeting } from "./types";
 import { SELF } from "./utils";
 
 const USER = "rohit"; // single-user V1; becomes auth.uid() when auth is added
@@ -49,6 +49,20 @@ function check(op: string, error: { message: string } | null) {
 // Additive (v1.8): older commitments simply have no `updates`; absent = [] on read, never a
 // destructive backfill.
 const normUpdates = (raw: unknown): Commitment["updates"] => (Array.isArray(raw) ? (raw as Commitment["updates"]) : []);
+
+// Additive (v1.17): older concerns simply have no `status` — absent means "open", same
+// backward-compat pattern as Commitment.status before it. No migration needed since concerns
+// already live inside the existing `concerns` JSONB column.
+function normConcern(raw: Record<string, unknown>): Concern {
+  return {
+    id: String(raw.id),
+    text: String(raw.text ?? ""),
+    stakeholderId: (raw.stakeholderId as string | null) ?? null,
+    source: raw.source as string | undefined,
+    status: (raw.status as Concern["status"]) ?? "open",
+    resolution: raw.resolution as Concern["resolution"] | undefined,
+  };
+}
 
 // Migrate legacy commitments ({owedByMe, stakeholderId}) to directional ({ownerId, owedToId}).
 function normCommitment(raw: Record<string, unknown>): Commitment {
@@ -99,7 +113,7 @@ function toMeeting(r: MeetingRow): Meeting {
     mentioned: arr<string>(r.mentioned),
     expectations: arr<Meeting["expectations"][number]>(r.expectations),
     commitments: arr<Record<string, unknown>>(r.commitments).map(normCommitment),
-    concerns: arr<Meeting["concerns"][number]>(r.concerns),
+    concerns: arr<Record<string, unknown>>(r.concerns).map(normConcern),
     decisions: arr<string>(r.decisions),
     actionItems: arr<string>(r.action_items),
     transcript: r.transcript ?? undefined,
