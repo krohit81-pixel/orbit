@@ -3,6 +3,7 @@
 import { ArrowLeft, Check, CircleDot, CheckCircle2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Eyebrow, SectionTitle } from "@/components/bits";
 import { useFlow } from "@/components/flow";
 import { cn, fmtFull, fmtTime12h } from "@/lib/utils";
@@ -15,15 +16,47 @@ function timeRange(it: { startTime: string | null; endTime: string | null }): st
   return start;
 }
 
-function EntrySummary({ e }: { e: ExtractedScheduleItem }) {
-  const time = timeRange(e);
+// Reading a precise time off a photographed calendar grid is a genuinely hard vision task —
+// verified against a real photo, the model's own reading varied by hours run to run even
+// after tightening the prompt (see master context §10/§27's v1.16.3 addendum). Rather than
+// pretend the extraction is reliable, every reviewable time is editable right here: a wrong
+// read costs two taps to fix instead of becoming a silently wrong fact with no way to catch
+// it before Save.
+function EditableTime({
+  startTime, endTime, onChange,
+}: {
+  startTime: string | null;
+  endTime: string | null;
+  onChange: (startTime: string | null, endTime: string | null) => void;
+}) {
+  return (
+    <div className="mt-1 flex items-center gap-1.5">
+      <Input
+        type="time"
+        value={startTime ?? ""}
+        onChange={(e) => onChange(e.target.value || null, endTime)}
+        className="h-8 w-auto px-2 text-[12.5px]"
+        aria-label="Start time"
+      />
+      <span className="text-[12px] text-muted-foreground">–</span>
+      <Input
+        type="time"
+        value={endTime ?? ""}
+        onChange={(e) => onChange(startTime, e.target.value || null)}
+        className="h-8 w-auto px-2 text-[12.5px]"
+        aria-label="End time"
+      />
+    </div>
+  );
+}
+
+function EntrySummary({ e, onTimeChange }: { e: ExtractedScheduleItem; onTimeChange: (startTime: string | null, endTime: string | null) => void }) {
   return (
     <>
       <div className="font-semibold leading-snug">{e.title}</div>
-      <div className="mt-0.5 text-[12.5px] text-muted-foreground">
-        {fmtFull(e.date)}{time ? ` · ${time}` : ""}
-      </div>
-      {e.attendees.length > 0 && <div className="mt-1 text-[12.5px] text-muted-foreground/80">{e.attendees.join(", ")}</div>}
+      <div className="mt-0.5 text-[12.5px] text-muted-foreground">{fmtFull(e.date)}</div>
+      <EditableTime startTime={e.startTime} endTime={e.endTime} onChange={onTimeChange} />
+      {e.attendees.length > 0 && <div className="mt-1.5 text-[12.5px] text-muted-foreground/80">{e.attendees.join(", ")}</div>}
       {e.location && <div className="mt-0.5 text-[12px] text-muted-foreground/70">{e.location}</div>}
     </>
   );
@@ -83,7 +116,12 @@ export function ScheduleReviewScreen() {
           {newItems.map((it) => (
             <Card key={it._id} className={cn("mb-2.5", !it.include && "opacity-45")}><CardContent className="flex items-start gap-2.5">
               <Toggle on={it.include} onClick={() => patch(it._id, { include: !it.include })} />
-              <div className="flex-1"><EntrySummary e={it.extracted} /></div>
+              <div className="flex-1">
+                <EntrySummary
+                  e={it.extracted}
+                  onTimeChange={(startTime, endTime) => patch(it._id, { extracted: { ...it.extracted, startTime, endTime } })}
+                />
+              </div>
             </CardContent></Card>
           ))}
         </>
@@ -97,15 +135,18 @@ export function ScheduleReviewScreen() {
               <Toggle on={it.include} onClick={() => patch(it._id, { include: !it.include })} />
               <div className="flex-1">
                 <div className="font-semibold leading-snug">{it.extracted.title}</div>
-                <div className="mt-1 text-[12.5px] text-muted-foreground">
-                  <span className="line-through opacity-70">
+                <div className="mt-1 text-[12.5px]">
+                  <span className="text-muted-foreground line-through opacity-70">
                     {fmtFull(it.existing!.date)}{timeRange(it.existing!) ? ` · ${timeRange(it.existing!)}` : ""}
                   </span>
-                  <span className="mx-1.5">→</span>
-                  <span className="font-medium text-foreground">
-                    {fmtFull(it.extracted.date)}{timeRange(it.extracted) ? ` · ${timeRange(it.extracted)}` : ""}
-                  </span>
+                  <span className="mx-1.5 text-muted-foreground">→</span>
+                  <span className="font-medium text-foreground">{fmtFull(it.extracted.date)}</span>
                 </div>
+                <EditableTime
+                  startTime={it.extracted.startTime}
+                  endTime={it.extracted.endTime}
+                  onChange={(startTime, endTime) => patch(it._id, { extracted: { ...it.extracted, startTime, endTime } })}
+                />
               </div>
             </CardContent></Card>
           ))}
@@ -121,7 +162,12 @@ export function ScheduleReviewScreen() {
           {uncertainItems.map((it) => (
             <Card key={it._id} className="mb-2.5"><CardContent>
               <Eyebrow>From the photo</Eyebrow>
-              <div className="mt-1"><EntrySummary e={it.extracted} /></div>
+              <div className="mt-1">
+                <EntrySummary
+                  e={it.extracted}
+                  onTimeChange={(startTime, endTime) => patch(it._id, { extracted: { ...it.extracted, startTime, endTime } })}
+                />
+              </div>
               <div className="mt-2.5 border-t border-border pt-2.5">
                 <Eyebrow>Possibly the same as</Eyebrow>
                 <div className="mt-1 text-[13px] font-medium">{it.existing!.title}</div>

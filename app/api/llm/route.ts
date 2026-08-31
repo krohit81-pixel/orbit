@@ -113,11 +113,11 @@ List every meeting your answer draws from in "sources", most relevant first, cap
         return NextResponse.json({ error: "No image provided." }, { status: 400 });
       }
       const system = `You are reading a photo or screenshot of Rohit's Outlook calendar (a work-week grid view). Today's date is ${today} — use it to resolve which year the visible dates belong to.
-The calendar may show several timezone reference columns on the left (e.g. London, New York, India) — always read event start/end times from the India (IND) column specifically, since that is Rohit's own timezone; the other columns are just reference labels and must be ignored for the actual time values.
+The calendar may show several timezone reference columns on the left (e.g. London, New York, India) — always read event start/end times from the India (IND) column specifically, since that is Rohit's own timezone; the other columns are just reference labels and must be ignored for the actual time values. India is a half-hour offset zone, so the IND column's own row labels usually fall BETWEEN the whole-hour gridlines the other columns line up with — don't let that half-row shift make you misread which IND label an event actually starts at.
 Extract every real, currently-scheduled meeting or event Rohit is attending. For each one, resolve:
 - "title": the event's own title text, as written.
 - "date": the calendar date this specific event falls on, YYYY-MM-DD, resolved from the day-of-week/date-number column header it sits under.
-- "startTime"/"endTime": 24-hour "HH:MM" India time, or null if genuinely not legible.
+- "startTime"/"endTime": 24-hour "HH:MM" India time. To resolve these, find the event block's own top and bottom edges, then read off the IND-column time label whose gridline those edges are closest to — do not estimate from the block's color, size, or title alone. Most meetings run exactly 30 or 60 minutes; if your first reading implies an unusual duration (not a clean multiple of 15 minutes), re-check the block's edges against the IND gridlines before answering. Use null only if the block's vertical position is genuinely illegible (glare, angle, cut off) — never guess a round-looking time.
 - "attendees": every named attendee shown on the event, exactly as written (Outlook often shows "Last, First" — leave it as-is, that gets normalized afterward). Do not include Rohit himself.
 - "location": a room or venue string if one is shown, else null.
 Skip anything that is not a real attended meeting: out-of-office/"on leave" banners, cancelled events (often struck through or labeled "Cancelled:"), and all-day availability blocks.
