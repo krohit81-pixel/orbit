@@ -38,8 +38,18 @@ async function callClaude(system: string, content: string | unknown[], maxTokens
   return text;
 }
 
-function stripFences(t: string): string {
-  return t.replace(/```json/gi, "").replace(/```/g, "").trim();
+// Every task's prompt says "Respond with ONLY valid JSON (no markdown, no commentary)" — but
+// the model doesn't always comply, occasionally prefacing the JSON with a stray sentence
+// ("I'll carefully analyze..."), especially on vision tasks with a lot to describe. Stripping
+// markdown fences alone doesn't help with that. Since every task here returns exactly one JSON
+// object, slicing from the first "{" to the last "}" recovers it regardless of what the model
+// wrapped around it, while leaving genuinely-clean output untouched.
+function extractJson(t: string): string {
+  const stripped = t.replace(/```json/gi, "").replace(/```/g, "").trim();
+  const start = stripped.indexOf("{");
+  const end = stripped.lastIndexOf("}");
+  if (start === -1 || end === -1 || end < start) return stripped;
+  return stripped.slice(start, end + 1);
 }
 
 export async function POST(req: Request) {
@@ -75,7 +85,7 @@ If there are no open commitments listed above, or none of them are touched by th
       const raw = await callClaude(system, transcript, 8192);
       let parsed;
       try {
-        parsed = JSON.parse(stripFences(raw));
+        parsed = JSON.parse(extractJson(raw));
       } catch {
         throw new Error(
           "The extraction response wasn't valid JSON (it may have been cut off for a very long transcript). Try again, or split the transcript into smaller sections."
@@ -102,7 +112,7 @@ Keep every entry under 8 words, specific to the digest, never generic filler. If
       const raw = await callClaude(system, digest, 600);
       let parsed;
       try {
-        parsed = JSON.parse(stripFences(raw));
+        parsed = JSON.parse(extractJson(raw));
       } catch {
         throw new Error("The weekly report response wasn't valid JSON. Please try generating it again.");
       }
@@ -118,7 +128,7 @@ Keep every bullet under 18 words. Ground every bullet in the digest — never in
       const raw = await callClaude(system, digest, 500);
       let parsed;
       try {
-        parsed = JSON.parse(stripFences(raw));
+        parsed = JSON.parse(extractJson(raw));
       } catch {
         throw new Error("The brief response wasn't valid JSON. Please try refreshing it again.");
       }
@@ -137,7 +147,7 @@ List every meeting your answer draws from in "sources", most relevant first, cap
       const raw = await callClaude(system, user, 700);
       let parsed;
       try {
-        parsed = JSON.parse(stripFences(raw));
+        parsed = JSON.parse(extractJson(raw));
       } catch {
         throw new Error("The answer wasn't valid JSON. Please try asking again.");
       }
@@ -168,12 +178,19 @@ If you can't find any real meetings, return {"meetings":[]}.`;
         { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
         { type: "text", text: "Extract the meetings from this calendar photo." },
       ];
-      const raw = await callClaude(system, content, 3000);
+      // A real full work-week can hold 15-20+ meetings, each with a title, attendees and a
+      // location — 3000 tokens measured too close to that ceiling in practice (real photos
+      // ran 1300-1850 output tokens with meaningful run-to-run variance) and a denser real
+      // photo tipped over it, truncating the JSON mid-string. Matches `extract`'s own 8192
+      // budget for the same reason: a structured-JSON task needs headroom, not a tight cap.
+      const raw = await callClaude(system, content, 8192);
       let parsed;
       try {
-        parsed = JSON.parse(stripFences(raw));
+        parsed = JSON.parse(extractJson(raw));
       } catch {
-        throw new Error("The schedule response wasn't valid JSON. Please try again, or try a clearer photo.");
+        throw new Error(
+          "The schedule response wasn't valid JSON (it may have been cut off for a very busy week). Please try again, or try a clearer/narrower photo."
+        );
       }
       return NextResponse.json({ meetings: parsed.meetings ?? [] });
     }
