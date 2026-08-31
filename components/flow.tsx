@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext } from "react";
-import type { ReviewModel, ScheduleReviewItem } from "@/lib/types";
+import type { PendingMeetingReview, ReviewModel, ScheduleReviewItem } from "@/lib/types";
 
 export type View =
   | { screen: "home" }
@@ -17,7 +17,8 @@ export type View =
   | { screen: "meetingPrint"; id: string }
   | { screen: "weeklyReport" }
   | { screen: "importSchedule" }
-  | { screen: "scheduleReview" };
+  | { screen: "scheduleReview" }
+  | { screen: "pendingReviews" };
 
 export interface Flow {
   view: View;
@@ -44,6 +45,15 @@ export interface Flow {
   setScheduleReview: (items: ScheduleReviewItem[]) => void;
   runScheduleExtraction: (imageBase64: string, mediaType: string) => Promise<void>;
   commitSchedule: () => Promise<void>;
+  // Overnight meeting close-out review queue (v1.16) — reuses `review`/`setReview`/`commit`
+  // above rather than a parallel review model: opening the queue just points `review` at the
+  // current PendingMeetingReview's built ReviewModel, and `commit()` (in Orbit.tsx) checks
+  // `view.screen === "pendingReviews"` to know it should also clear the staging row and
+  // advance to the next one instead of returning to the capture screen.
+  pendingQueue: PendingMeetingReview[];
+  pendingIndex: number;
+  openPendingReviews: () => void;
+  skipPendingReview: () => Promise<void>;
 }
 
 export const FlowCtx = createContext<Flow | null>(null);

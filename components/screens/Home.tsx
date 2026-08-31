@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, ChevronRight, ChevronDown, Sparkles, AlertTriangle, RefreshCw, CalendarDays } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Sparkles, AlertTriangle, RefreshCw, CalendarDays, ClipboardCheck } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { CommitmentStrip, Eyebrow, DueLabel, Spinner, WeekGantt, vibrantCard } from "@/components/bits";
 import { cn } from "@/lib/utils";
 import { useOrbit } from "@/components/OrbitStore";
@@ -16,8 +17,8 @@ import type { TodaysBrief } from "@/lib/types";
 const BRIEF_CACHE_KEY = "orbit-todays-brief";
 
 export function HomeScreen() {
-  const { stakeholders, meetings } = useOrbit();
-  const { go } = useFlow();
+  const { stakeholders, meetings, pendingMeetingReviews } = useOrbit();
+  const { go, openPendingReviews } = useFlow();
   const open = openCommitmentsInvolvingMe(meetings);
   const gantt = weekGanttData(meetings);
 
@@ -131,6 +132,22 @@ export function HomeScreen() {
   return (
     <div>
       <h1 className="mb-4 mt-1 text-[26px] font-bold leading-tight tracking-tight">What needs your attention</h1>
+
+      {/* Overnight meeting close-out (v1.16) — surfaced here, the "what needs your attention"
+          landing screen, since these sat waiting since last night's cron run and nothing else
+          in the app currently points at them. Never auto-added to Meetings; this is only an
+          entry point into reviewing them. */}
+      {pendingMeetingReviews.length > 0 && (
+        <div className={cn(vibrantCard, "mb-[18px] rounded-md bg-accent/40 px-3.5 py-3.5")}>
+          <div className="flex items-center gap-1.5 text-[13px] font-bold tracking-tight text-foreground">
+            <ClipboardCheck className="h-4 w-4 text-primary" /> Ready for review
+          </div>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+            {pendingMeetingReviews.length} meeting{pendingMeetingReviews.length === 1 ? "" : "s"} from your calendar {pendingMeetingReviews.length === 1 ? "has" : "have"} passed and {pendingMeetingReviews.length === 1 ? "is" : "are"} ready to add to Meetings, with whatever your prep notes captured.
+          </p>
+          <Button className="mt-2.5 w-full" onClick={openPendingReviews}>Review now</Button>
+        </div>
+      )}
 
       {/* This week (v1.14) — sits above Today's Brief, deliberately independent of it: no LLM
           call, no "generate" gate, renders live straight from weekGanttData() every time Home

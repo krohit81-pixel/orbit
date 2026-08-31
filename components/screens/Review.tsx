@@ -17,7 +17,8 @@ const SUGGESTION_ACTION_LABEL: Record<string, string> = {
 };
 
 export function ReviewScreen() {
-  const { review, setReview, go, commit } = useFlow();
+  const { view, review, setReview, go, commit, pendingQueue, pendingIndex, skipPendingReview } = useFlow();
+  const isPendingQueue = view.screen === "pendingReviews";
   if (!review) return <div className="py-10 text-center text-muted-foreground">Nothing to review.</div>;
   const r = review;
 
@@ -42,11 +43,15 @@ export function ReviewScreen() {
   return (
     <div>
       <div className="flex items-center gap-3 py-2 pb-2">
-        <button onClick={() => go({ screen: "capture" })}><ArrowLeft className="h-5 w-5" /></button>
-        <div className="text-[26px] font-bold tracking-tight">Review</div>
+        <button onClick={() => go({ screen: isPendingQueue ? "meetings" : "capture" })}><ArrowLeft className="h-5 w-5" /></button>
+        <div className="text-[26px] font-bold tracking-tight">
+          {isPendingQueue ? `Review meeting ${pendingIndex + 1} of ${pendingQueue.length}` : "Review"}
+        </div>
       </div>
       <p className="mb-2 text-[13.5px] leading-relaxed text-muted-foreground">
-        Nothing is saved yet. Drop anything that&apos;s wrong, then commit what&apos;s right to your knowledge base.
+        {isPendingQueue
+          ? "Extracted from your own prep notes for this meeting, now that its date has passed. Nothing is saved yet."
+          : "Nothing is saved yet. Drop anything that's wrong, then commit what's right to your knowledge base."}
       </p>
 
       <Card className="mb-4 bg-accent/40"><CardContent>
@@ -149,11 +154,17 @@ export function ReviewScreen() {
       )}
 
       <Button className="mt-4 w-full" onClick={commit}>
-        <Check className="h-[18px] w-[18px]" /> Commit {includedCount} item(s) to knowledge base
+        <Check className="h-[18px] w-[18px]" /> {isPendingQueue ? `Add to Meetings (${includedCount} item(s))` : `Commit ${includedCount} item(s) to knowledge base`}
       </Button>
-      <Button variant="secondary" className="mt-2.5 w-full" onClick={() => go({ screen: "capture" })}>
-        Back to transcript
-      </Button>
+      {isPendingQueue ? (
+        <Button variant="secondary" className="mt-2.5 w-full" onClick={skipPendingReview}>
+          Skip this one — don&apos;t add it
+        </Button>
+      ) : (
+        <Button variant="secondary" className="mt-2.5 w-full" onClick={() => go({ screen: "capture" })}>
+          Back to transcript
+        </Button>
+      )}
     </div>
   );
 }

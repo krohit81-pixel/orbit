@@ -167,10 +167,12 @@ export interface ReviewModel {
 // --- upcoming (scheduled) meetings, imported from a calendar photo (v1.15) ---
 // A deliberately separate, lighter entity from Meeting: no transcript, no extracted
 // intelligence (topics/expectations/commitments/concerns) — just what's on the calendar,
-// plus a place for the owner's own prep notes. Never auto-converted into a Meeting once its
-// date passes; it just drops off the "Upcoming" list (see lib/utils selectors). Attendees are
-// stored as raw names, not yet resolved to Stakeholder ids — linking them is a natural next
-// step once this proves out, deliberately not built in v1.
+// plus a place for the owner's own prep notes. Once its date elapses, the overnight
+// process-elapsed-meetings cron (v1.16) turns it into a PendingMeetingReview below rather
+// than a Meeting directly — nothing AI-derived skips human review just because a cron job,
+// not a button, triggered it. Attendees are stored as raw names, not yet resolved to
+// Stakeholder ids — linking them is a natural next step once this proves out, deliberately
+// not built in v1.
 export interface UpcomingMeeting {
   id: string;
   title: string;
@@ -224,4 +226,29 @@ export interface ScheduleReviewItem extends ReviewItem {
 export interface ScheduleMatchResult {
   items: ScheduleReviewItem[]; // new + updated + uncertain, ready for the review screen
   unchangedCount: number; // already recorded, identical — silently skipped, just reported
+}
+
+// --- overnight meeting close-out (v1.16) ---
+// A nightly cron (app/api/cron/process-elapsed-meetings) turns each UpcomingMeeting whose
+// date has passed into one of these, extracting whatever intelligence the owner's own prep
+// notes actually contain (deliberately blank/empty arrays when the notes don't say much —
+// never invented to fill out the shape). Deliberately staged here rather than written
+// straight to `orbit.meetings`: the "review before commit" invariant applies just as much to
+// something a cron produced overnight as to something a button produced live — a human still
+// has to look at it before it becomes a real Meeting. The stored `extraction` is the same
+// raw shape the "extract" LLM task returns, so the existing buildReview()/commitMeeting()
+// pipeline (Orbit.tsx) handles it unchanged — this is a second producer of that shape, not a
+// second review/commit pathway.
+export interface PendingMeetingReview {
+  id: string;
+  sourceUpcomingMeetingId: string | null; // the UpcomingMeeting row this was generated from (already deleted by the time this exists)
+  title: string;
+  date: string; // ISO yyyy-mm-dd — the meeting's own date, not the night the cron ran
+  startTime: string | null;
+  endTime: string | null;
+  attendees: string[];
+  location: string | null;
+  notes: string | null; // the owner's own prep notes this was generated from — becomes Meeting.transcript on commit, same provenance role a pasted transcript plays for a live capture
+  extraction: Extraction;
+  createdAt: string; // ISO timestamp — when the cron generated this
 }

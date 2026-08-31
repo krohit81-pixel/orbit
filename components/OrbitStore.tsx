@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import * as db from "@/lib/db";
 import { supabaseConfigured } from "@/lib/supabase/client";
 import { uid } from "@/lib/utils";
-import type { Meeting, ReviewModel, ScheduleReviewItem, Stakeholder, UpcomingMeeting } from "@/lib/types";
+import type { Meeting, PendingMeetingReview, ReviewModel, ScheduleReviewItem, Stakeholder, UpcomingMeeting } from "@/lib/types";
 
 interface OrbitContextValue {
   ready: boolean;
@@ -14,6 +14,7 @@ interface OrbitContextValue {
   stakeholders: Stakeholder[];
   meetings: Meeting[];
   upcomingMeetings: UpcomingMeeting[];
+  pendingMeetingReviews: PendingMeetingReview[];
   refresh: () => Promise<void>;
   addStakeholder: (s: Omit<Stakeholder, "id" | "summary">) => Promise<string>;
   saveStakeholder: (s: Stakeholder) => Promise<void>;
@@ -27,6 +28,10 @@ interface OrbitContextValue {
   commitSchedule: (items: ScheduleReviewItem[]) => Promise<void>;
   saveUpcomingMeetingNotes: (id: string, notes: string) => Promise<void>;
   deleteUpcomingMeeting: (id: string) => Promise<void>;
+  // Removes a staged PendingMeetingReview row — used both when the owner discards one outright
+  // and, after a successful commitMeeting(), to clear the staging row an accepted one leaves
+  // behind (the DB operation is identical either way; only what happens before it differs).
+  deletePendingMeetingReview: (id: string) => Promise<void>;
 }
 
 const Ctx = createContext<OrbitContextValue | null>(null);
@@ -37,12 +42,14 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [upcomingMeetings, setUpcomingMeetings] = useState<UpcomingMeeting[]>([]);
+  const [pendingMeetingReviews, setPendingMeetingReviews] = useState<PendingMeetingReview[]>([]);
 
   const refresh = useCallback(async () => {
-    const { stakeholders, meetings, upcomingMeetings } = await db.fetchAll();
+    const { stakeholders, meetings, upcomingMeetings, pendingMeetingReviews } = await db.fetchAll();
     setStakeholders(stakeholders);
     setMeetings(meetings);
     setUpcomingMeetings(upcomingMeetings);
+    setPendingMeetingReviews(pendingMeetingReviews);
   }, []);
 
   useEffect(() => {
@@ -335,11 +342,16 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
     await db.deleteUpcomingMeeting(id);
   }, []);
 
+  const deletePendingMeetingReview = useCallback(async (id: string) => {
+    setPendingMeetingReviews((prev) => prev.filter((p) => p.id !== id));
+    await db.deletePendingMeetingReview(id);
+  }, []);
+
   const value: OrbitContextValue = {
     ready, configured: supabaseConfigured, error, self: { name: "Rohit" },
-    stakeholders, meetings, upcomingMeetings, refresh, addStakeholder, saveStakeholder, deleteStakeholder,
+    stakeholders, meetings, upcomingMeetings, pendingMeetingReviews, refresh, addStakeholder, saveStakeholder, deleteStakeholder,
     commitMeeting, saveMeeting, deleteMeeting, toggleCommitment, addCommitmentUpdate, setSummary,
-    commitSchedule, saveUpcomingMeetingNotes, deleteUpcomingMeeting,
+    commitSchedule, saveUpcomingMeetingNotes, deleteUpcomingMeeting, deletePendingMeetingReview,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

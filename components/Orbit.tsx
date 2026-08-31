@@ -22,8 +22,8 @@ import { ScheduleReviewScreen } from "./screens/ScheduleReview";
 import { Spinner } from "./bits";
 import { allOpenCommitments, commitmentLabel, matchSchedule, normalizeAttendeeName, openCommitmentsDigest, todayISO, uid } from "@/lib/utils";
 import type {
-  Extraction, ExtractedScheduleItem, Meeting, ReviewCommitmentSuggestion, ReviewModel,
-  ReviewPerson, ScheduleReviewItem, Stakeholder,
+  Extraction, ExtractedScheduleItem, Meeting, PendingMeetingReview, ReviewCommitmentSuggestion,
+  ReviewModel, ReviewPerson, ScheduleReviewItem, Stakeholder,
 } from "@/lib/types";
 
 function buildReview(
@@ -121,8 +121,48 @@ function Inner() {
   const [scheduleErr, setScheduleErr] = useState("");
   const [scheduleReview, setScheduleReview] = useState<ScheduleReviewItem[] | null>(null);
   const [scheduleUnchangedCount, setScheduleUnchangedCount] = useState(0);
+  const [pendingQueue, setPendingQueue] = useState<PendingMeetingReview[]>([]);
+  const [pendingIndex, setPendingIndex] = useState(0);
 
   const knownNames = () => new Set(store.stakeholders.map((s) => s.name.toLowerCase().trim()));
+
+  const buildPendingReview = (item: PendingMeetingReview): ReviewModel =>
+    buildReview(item.extraction, knownNames(), item.date, item.notes || "", store.meetings, store.stakeholders);
+
+  // Opens the overnight close-out queue (v1.16) — a snapshot of store.pendingMeetingReviews
+  // taken once, so items don't shift under the owner mid-review if a refresh lands while
+  // they're stepping through it.
+  const openPendingReviews = () => {
+    const queue = store.pendingMeetingReviews;
+    if (queue.length === 0) return;
+    setPendingQueue(queue);
+    setPendingIndex(0);
+    setReview(buildPendingReview(queue[0]));
+    setView({ screen: "pendingReviews" });
+  };
+
+  const advancePendingQueue = () => {
+    const next = pendingIndex + 1;
+    if (next < pendingQueue.length) {
+      setPendingIndex(next);
+      setReview(buildPendingReview(pendingQueue[next]));
+    } else {
+      setReview(null);
+      setPendingQueue([]);
+      setPendingIndex(0);
+      setView({ screen: "meetings" });
+    }
+  };
+
+  // Discards the current queue item without adding it to Meetings — e.g. a note that turns
+  // out to mean the meeting didn't actually happen. Same "review before commit" spirit as
+  // rejecting anything else in a review screen; this just skips the whole item rather than
+  // one field within it.
+  const skipPendingReview = async () => {
+    const current = pendingQueue[pendingIndex];
+    if (current) await store.deletePendingMeetingReview(current.id);
+    advancePendingQueue();
+  };
 
   const runExtraction = async () => {
     setErr("");
@@ -158,6 +198,16 @@ function Inner() {
 
   const commit = async () => {
     if (!review) return;
+    // Overnight close-out queue (v1.16): same commitMeeting() as a live capture, just
+    // followed by clearing the staging row and advancing to the next queued item instead of
+    // resetting the transcript draft and returning to Meetings outright.
+    if (view.screen === "pendingReviews") {
+      await store.commitMeeting(review);
+      const current = pendingQueue[pendingIndex];
+      if (current) await store.deletePendingMeetingReview(current.id);
+      advancePendingQueue();
+      return;
+    }
     await store.commitMeeting(review);
     // Apply accepted commitment-update suggestions against the EXISTING meetings/commitments
     // they refer to — separate from the new meeting just committed above. Each rides the
@@ -226,6 +276,7 @@ function Inner() {
     scheduleBusy, scheduleErr, scheduleReview, scheduleUnchangedCount,
     setScheduleReview: (items) => setScheduleReview(items),
     runScheduleExtraction, commitSchedule,
+    pendingQueue, pendingIndex, openPendingReviews, skipPendingReview,
   };
 
   let body: React.ReactNode;
@@ -245,6 +296,7 @@ function Inner() {
     case "weeklyReport": body = <WeeklyReportScreen />; break;
     case "importSchedule": body = <ImportScheduleScreen />; break;
     case "scheduleReview": body = <ScheduleReviewScreen />; break;
+    case "pendingReviews": body = <ReviewScreen />; break;
     default: body = <HomeScreen />;
   }
 
