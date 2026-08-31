@@ -228,6 +228,22 @@ export function normalizeAttendeeName(name: string): string {
   const m = name.trim().match(/^([A-Za-z'-]+),\s*([A-Za-z'-]+)$/);
   return m ? `${m[2]} ${m[1]}` : name.trim();
 }
+
+// A deliberate, deterministic marker convention (v1.16.1) for the overnight close-out cron:
+// if the owner's own prep note says the meeting is already captured elsewhere in Orbit (he
+// paste-captured it through the normal transcript flow separately), the cron should skip it
+// entirely rather than stage a redundant, near-empty PendingMeetingReview he'd just have to
+// discard. This is a fact check on text the owner himself wrote and controls, not a judgment
+// call about the note's meaning — so it's a fixed phrase match, not an LLM call, same "code
+// for facts" reasoning as normalizeAttendeeName() above. Keep this list short and specific
+// (multi-word phrases only) so a genuine note that happens to contain "logged" in another
+// sense — "the team logged some concerns" — never false-positives.
+const ALREADY_LOGGED_MARKERS = ["already logged", "already captured", "already added", "logged separately", "captured separately"];
+export function isAlreadyLoggedNote(notes: string | null | undefined): boolean {
+  if (!notes) return false;
+  const n = notes.toLowerCase();
+  return ALREADY_LOGGED_MARKERS.some((m) => n.includes(m));
+}
 // The other party from the user's perspective (for grouping); null if third-party.
 export function otherParty(c: Commitment): string | null {
   if (c.ownerId === SELF) return c.owedToId && c.owedToId !== SELF ? c.owedToId : null;

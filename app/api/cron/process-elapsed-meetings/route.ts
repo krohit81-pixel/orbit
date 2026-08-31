@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { callClaude, extractJson } from "@/lib/llm";
 import { deleteUpcomingMeeting, fetchElapsedUpcomingMeetings, insertPendingMeetingReview } from "@/lib/db";
-import { uid } from "@/lib/utils";
+import { isAlreadyLoggedNote, uid } from "@/lib/utils";
 import type { Extraction, ExtractedPerson } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -104,10 +104,23 @@ export async function GET(req: Request) {
   }
 
   let processed = 0;
+  let skippedAlreadyLogged = 0;
   const failures: string[] = [];
 
   for (const u of elapsed) {
     try {
+      // v1.16.1: if the owner's own note says this meeting is already captured elsewhere in
+      // Orbit (he ran it through the normal transcript-capture flow separately), skip it
+      // outright rather than stage a redundant, near-empty PendingMeetingReview he'd just
+      // discard — no LLM call needed, isAlreadyLoggedNote() is a plain text-marker check. The
+      // real Meeting already exists from whatever captured it; deleting the now-redundant
+      // UpcomingMeeting row loses nothing.
+      if (isAlreadyLoggedNote(u.notes)) {
+        await deleteUpcomingMeeting(u.id);
+        skippedAlreadyLogged++;
+        continue;
+      }
+
       const fields = await extractFromNotes(u.title, u.date, u.attendees, u.location, u.notes || "");
       // Attendees already known from the calendar itself are seeded in directly rather than
       // trusted to come back out of the note text again — same "don't re-derive what's
@@ -145,5 +158,5 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ cutoff, total: elapsed.length, processed, failures });
+  return NextResponse.json({ cutoff, total: elapsed.length, processed, skippedAlreadyLogged, failures });
 }
