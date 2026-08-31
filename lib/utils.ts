@@ -189,6 +189,18 @@ export function tileCounterparty(c: Commitment, stakeholders: Stakeholder[]): { 
   }
   return { name: partyName(stakeholders, c.ownerId), direction: "in" };
 }
+// A short, deterministic "what this is about" label for the week-gantt bar (v1.14.2) — the
+// first few real words of the commitment's own text, never a model's restatement (same
+// provenance principle as master context §5, applied to a label instead of a citation). A
+// small set of common leading filler phrases ("Rohit will", "I'll", ...) is stripped first so
+// the remaining words carry more of the actual topic; the caller is still responsible for
+// truncating with an ellipsis at render time, since even a handful of words can overflow a
+// narrow bar depending on the font and the bar's actual pixel width.
+const LABEL_FILLER = /^(rohit will |rohit to |rohit is going to |i will |i'll |you will )/i;
+export function shortLabel(text: string, maxWords = 4): string {
+  const stripped = text.replace(LABEL_FILLER, "").trim();
+  return stripped.split(/\s+/).slice(0, maxWords).join(" ");
+}
 // The other party from the user's perspective (for grouping); null if third-party.
 export function otherParty(c: Commitment): string | null {
   if (c.ownerId === SELF) return c.owedToId && c.owedToId !== SELF ? c.owedToId : null;
