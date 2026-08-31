@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, ChevronRight, ChevronDown, Sparkles, AlertTriangle, RefreshCw } from "lucide-react";
+import { Search, ChevronRight, ChevronDown, Sparkles, AlertTriangle, RefreshCw, CalendarDays } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { CommitmentStrip, Eyebrow, DueLabel, Spinner, vibrantCard } from "@/components/bits";
+import { CommitmentStrip, Eyebrow, DueLabel, Spinner, WeekGantt, vibrantCard } from "@/components/bits";
 import { cn } from "@/lib/utils";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
 import {
   fmtFull, fmtStamp, intel, isOverdue, openCommitmentsInvolvingMe, otherParty, commitmentLabel,
-  stakeholderById, todaysBriefData, todayISO, type OpenCommitment,
+  stakeholderById, todaysBriefData, todayISO, weekGanttData, type OpenCommitment,
 } from "@/lib/utils";
 import type { TodaysBrief } from "@/lib/types";
 
@@ -19,6 +19,7 @@ export function HomeScreen() {
   const { stakeholders, meetings } = useOrbit();
   const { go } = useFlow();
   const open = openCommitmentsInvolvingMe(meetings);
+  const gantt = weekGanttData(meetings);
 
   // group by the other party — every item here already involves the user (openCommitmentsInvolvingMe),
   // so when otherParty() can't name a counterparty (e.g. "You owe" with no one specified), the
@@ -228,6 +229,21 @@ export function HomeScreen() {
           )}
         </div>
       )}
+
+      {/* This week (v1.14) — a rolling 7-day timeline, additive to Today's Brief above rather
+          than replacing its tile grid (a deliberate, narrower answer than swapping the two
+          out). No LLM call, no "generate" gate — deterministic, so it just renders live like
+          the tiles do, straight from weekGanttData(). */}
+      <div className={cn(vibrantCard, "mb-[18px] rounded-md px-3.5 py-3.5")}>
+        <div className="mb-2.5 flex items-center gap-1.5 text-[13px] font-bold tracking-tight text-foreground">
+          <CalendarDays className="h-4 w-4 text-primary" /> This week
+        </div>
+        {gantt.rows.length === 0 ? (
+          <div className="text-[13px] text-muted-foreground">Nothing due or overdue in the next 7 days.</div>
+        ) : (
+          <WeekGantt data={gantt} stakeholders={stakeholders} onSelect={(meetingId) => go({ screen: "meeting", id: meetingId })} />
+        )}
+      </div>
 
       <button
         onClick={() => go({ screen: "search" })}

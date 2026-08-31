@@ -15,12 +15,26 @@ export const uid = () => `id${_id++}_${Math.random().toString(36).slice(2, 7)}`;
 export const SELF = "me";
 
 // ---- dates ----
+// A real bug, found via v1.14's week-gantt (see master context §10): `toISOString()` always
+// converts to UTC, but `setDate()`/`getDate()`/`new Date()` operate in LOCAL time. Mixing the
+// two — build/mutate a Date using local-time methods, then read it back via `toISOString()` —
+// silently returns the WRONG calendar day whenever the local UTC offset is positive (true for
+// India Standard Time, UTC+5:30, where this app is actually used): local midnight is still the
+// previous day in UTC. `isoFromLocalDate` reads the calendar date back out using local getters
+// instead, which is what "today" or "N days from today" should mean for a single-timezone,
+// single-user app like this one.
+function isoFromLocalDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 export const isoIn = (days: number): string => {
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return isoFromLocalDate(d);
 };
-export const todayISO = () => new Date().toISOString().slice(0, 10);
+export const todayISO = () => isoFromLocalDate(new Date());
 export const fmtDate = (s?: string | null): string | null =>
   s ? new Date(s + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : null;
 export const fmtFull = (s?: string | null): string =>
@@ -29,11 +43,20 @@ export const fmtStamp = (iso?: string | null): string =>
   iso ? new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "";
 export const fmtToday = (): string =>
   new Date().toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
+// 3-letter weekday only ("Mon") — for the week-gantt day header (v1.14), the one place so
+// far that wants just the day name without a date attached.
+export const fmtWeekdayShort = (s: string): string =>
+  new Date(s + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short" });
 export const isOverdue = (s?: string | null): boolean => bucketDue(s) === "overdue";
 
+// `iso` is a plain calendar date with no timezone of its own — done entirely in UTC (parse as
+// UTC midnight, mutate with the UTC setter, serialize via toISOString, which is UTC) so the
+// round-trip can't drift a day the way mixing local-time parsing with UTC serialization did
+// (see the note above todayISO/isoIn — the same bug class, fixed the same way: pick one
+// timezone and never cross it mid-function).
 export function addDaysISO(iso: string, days: number): string {
-  const d = new Date(iso + "T00:00:00");
-  d.setDate(d.getDate() + days);
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 // Monday-start business week containing the given date.
@@ -208,6 +231,52 @@ export function openCommitmentsDigest(meetings: Meeting[], stakeholders: Stakeho
     .slice(0, cap)
     .map((c) => `[${c.id}] ${commitmentLabel(c, stakeholders)}: ${c.text}${c.dueDate ? ` (due ${fmtFull(c.dueDate)})` : c.due ? ` (due ${c.due})` : " (no due date)"}`)
     .join("\n");
+}
+
+// ---- week gantt (v1.14) ----
+// Deterministic "shape of the week" timeline for Home's dashboard — a rolling 7-day window
+// starting today, one row per open commitment due (or overdue) within it, each row's bar
+// spanning from the meeting it was raised in to its due date. Both endpoints are real,
+// already-tracked dates (Commitment has no separate "start date" field, so the meeting that
+// produced it stands in for one) — nothing invented, same provenance spirit as every other
+// derived view in the app. No LLM involved; read-only, click-through to the source meeting,
+// same interaction as CommitmentStrip's tiles right above it on Home.
+export interface WeekGanttRow {
+  commitment: OpenCommitment;
+  startCol: number; // 0-6, index into `days` — the meeting date, clamped into the window
+  endCol: number; // 0-6, index into `days` — the due date, clamped into the window; overdue
+                  // commitments clamp to column 0 ("today") rather than a past date off-grid
+  bucket: TileBucket; // color, from dueTileInfo() — the exact tokens CommitmentStrip uses
+}
+export interface WeekGanttData {
+  days: string[]; // 7 ISO dates, today first
+  rows: WeekGanttRow[]; // most urgent first
+}
+export function weekGanttData(meetings: Meeting[]): WeekGanttData {
+  const start = todayISO();
+  const days = Array.from({ length: 7 }, (_, i) => addDaysISO(start, i));
+  const startMs = new Date(start + "T00:00:00").getTime();
+  const dayIndexFrom = (iso: string) => Math.round((new Date(iso + "T00:00:00").getTime() - startMs) / 86400000);
+
+  // Reuses bucketDue's existing 7-day "week" window as the inclusion filter, rather than
+  // inventing a new one (see Design Decision #39 on the weekly report's near-identical
+  // choice) — an open commitment belongs on this timeline if it's overdue or due within the
+  // next 7 days. Undated commitments have no due date to place on a timeline, so they're
+  // excluded here (still fully visible elsewhere on Home and every Stakeholder screen).
+  const candidates = openCommitmentsInvolvingMe(meetings).filter((c) => {
+    if (!c.dueDate) return false;
+    const b = bucketDue(c.dueDate);
+    return b === "overdue" || b === "week";
+  });
+
+  const rows: WeekGanttRow[] = sortByUrgency(candidates).map((commitment) => {
+    const endCol = commitment.dueDate! < start ? 0 : Math.min(6, Math.max(0, dayIndexFrom(commitment.dueDate!)));
+    const startCol = Math.min(Math.max(0, dayIndexFrom(commitment.meeting.date)), endCol);
+    const { bucket } = dueTileInfo(commitment.dueDate);
+    return { commitment, startCol, endCol, bucket };
+  });
+
+  return { days, rows };
 }
 
 // ---- pdf export ----
