@@ -1,7 +1,8 @@
--- Orbit schema (v1.4+). Run this in the Supabase SQL editor for a FRESH project setup.
--- If you already have data from before v1.3, use supabase/migrations/002_split_schemas.sql
--- first, then supabase/migrations/003_add_meeting_transcript.sql (v1.4) — this file is
--- the from-scratch reference, not a migration.
+-- Orbit schema (v1.4+, upcoming_meetings added v1.15). Run this in the Supabase SQL editor
+-- for a FRESH project setup. If you already have data from before v1.3, use
+-- supabase/migrations/002_split_schemas.sql first, then 003_add_meeting_transcript.sql
+-- (v1.4), then 004_add_upcoming_meetings.sql (v1.15) — this file is the from-scratch
+-- reference, not a migration.
 --
 -- This project's Supabase instance is shared with the separate Risk Dashboard app,
 -- which lives in its own `risk_dashboard` schema. Orbit uses two schemas:
@@ -45,11 +46,31 @@ create table if not exists orbit.meetings (
   created_at   timestamptz default now()
 );
 
+-- Scheduled/future meetings imported from a calendar photo (v1.15) — deliberately separate
+-- from orbit.meetings: no transcript, no extracted intelligence, just what's on the calendar
+-- plus the owner's own prep notes. See migrations/004_add_upcoming_meetings.sql for the
+-- reasoning; this table definition matches it exactly.
+create table if not exists orbit.upcoming_meetings (
+  id           text primary key,
+  user_id      text not null default 'rohit',
+  title        text not null,
+  date         date not null,
+  start_time   text,
+  end_time     text,
+  attendees    jsonb default '[]'::jsonb,
+  location     text,
+  notes        text,
+  created_at   timestamptz default now(),
+  updated_at   timestamptz default now()
+);
+
 create index if not exists idx_stakeholders_user on shared.stakeholders (user_id);
 create index if not exists idx_meetings_user_date on orbit.meetings (user_id, date desc);
+create index if not exists idx_upcoming_meetings_user_date on orbit.upcoming_meetings (user_id, date asc);
 
 alter table shared.stakeholders enable row level security;
 alter table orbit.meetings enable row level security;
+alter table orbit.upcoming_meetings enable row level security;
 
 -- Permissive single-user policies. Replace `using (true)` / `with check (true)`
 -- with `using (auth.uid()::text = user_id)` once Supabase Auth is wired up.
@@ -58,6 +79,9 @@ create policy stakeholders_all on shared.stakeholders for all using (true) with 
 
 drop policy if exists meetings_all on orbit.meetings;
 create policy meetings_all on orbit.meetings for all using (true) with check (true);
+
+drop policy if exists upcoming_meetings_all on orbit.upcoming_meetings;
+create policy upcoming_meetings_all on orbit.upcoming_meetings for all using (true) with check (true);
 
 grant usage on schema shared to anon, authenticated, service_role;
 grant usage on schema orbit  to anon, authenticated, service_role;
