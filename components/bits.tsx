@@ -1,4 +1,7 @@
-import { ArrowDownLeft, ArrowUpRight, Quote, Star, Sun, Moon } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { ArrowDownLeft, ArrowUpRight, ChevronDown, Quote, Star, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   bucketDue, dueTileInfo, fmtDate, fmtFull, fmtWeekdayShort, shortLabel, tileCounterparty,
@@ -154,6 +157,10 @@ export function WeekGantt({
   stakeholders: Stakeholder[];
   onSelect: (meetingId: string) => void;
 }) {
+  // Which grouped rows are expanded to show their individual commitments — local, resets on
+  // remount, same "no persistence needed for pure UI state" treatment as Home's own collapsed
+  // commitment groups (see HomeScreen's openKeys).
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   if (data.rows.length === 0) return null;
   return (
     <div>
@@ -174,38 +181,59 @@ export function WeekGantt({
         </div>
         <div className="relative space-y-1 py-0.5">
           {data.rows.map((row) => {
-            const { name, direction } = tileCounterparty(row.commitment, stakeholders);
+            const { name, direction } = tileCounterparty(row.commitments[0], stakeholders);
+            const grouped = row.commitments.length > 1;
+            const isOpen = !!expanded[row.key];
             return (
-              <button
-                key={row.commitment.id}
-                onClick={() => onSelect(row.commitment.meeting.id)}
-                className="grid w-full grid-cols-[68px_repeat(7,1fr)] items-center gap-1 rounded-md py-0.5 text-left hover:bg-secondary/50"
-              >
-                <span className="flex items-center gap-0.5 truncate text-[11px] font-medium">
-                  {direction === "out" && <ArrowUpRight className="h-3 w-3 shrink-0 text-muted-foreground/60" aria-label="You owe" />}
-                  {direction === "in" && <ArrowDownLeft className="h-3 w-3 shrink-0 text-muted-foreground/60" aria-label="Owed to you" />}
-                  <span className="truncate">{name}</span>
-                </span>
-                <span
-                  className={cn("flex h-5 min-w-0 items-center overflow-hidden rounded-full border-2 px-1.5", GANTT_BAR_CLASS[row.bucket])}
-                  style={{ gridColumn: `${row.startCol + 2} / ${row.endCol + 3}` }}
-                  title={row.commitment.text}
+              <div key={row.key}>
+                <button
+                  onClick={() => (grouped ? setExpanded((e) => ({ ...e, [row.key]: !e[row.key] })) : onSelect(row.commitments[0].meeting.id))}
+                  className="grid w-full grid-cols-[68px_repeat(7,1fr)] items-center gap-1 rounded-md py-0.5 text-left hover:bg-secondary/50"
                 >
-                  {/* A short, real-text "what this is about" label (v1.14.2) — not the due
-                      date (that's already readable from the bar's position against the
-                      header). Only shown when the bar spans 2+ days: a single-day bar has no
-                      room for even a couple of words, and forcing text in would either
-                      overflow or need type too small to read. `truncate` + `min-w-0` on the
-                      parent guarantee the label is clipped with an ellipsis rather than ever
-                      pushing past the bar's own rounded edge, for narrower multi-day bars
-                      too (e.g. a commitment whose due date lands mid-week). */}
-                  {row.endCol > row.startCol && (
-                    <span className="truncate text-[9px] font-semibold leading-none">
-                      {shortLabel(row.commitment.text)}
-                    </span>
-                  )}
-                </span>
-              </button>
+                  <span className="flex items-center gap-0.5 truncate text-[11px] font-medium">
+                    {direction === "out" && <ArrowUpRight className="h-3 w-3 shrink-0 text-muted-foreground/60" aria-label="You owe" />}
+                    {direction === "in" && <ArrowDownLeft className="h-3 w-3 shrink-0 text-muted-foreground/60" aria-label="Owed to you" />}
+                    <span className="truncate">{name}</span>
+                  </span>
+                  <span
+                    className={cn("flex h-5 min-w-0 items-center justify-between overflow-hidden rounded-full border-2 px-1.5", GANTT_BAR_CLASS[row.bucket])}
+                    style={{ gridColumn: `${row.startCol + 2} / ${row.endCol + 3}` }}
+                    title={grouped ? `${row.commitments.length} items` : row.commitments[0].text}
+                  >
+                    {/* A short, real-text "what this is about" label (v1.14.2) — not the due
+                        date (that's already readable from the bar's position against the
+                        header). Only shown when the bar spans 2+ days: a single-day bar has no
+                        room for even a couple of words, and forcing text in would either
+                        overflow or need type too small to read. For a grouped row, the count
+                        replaces the label entirely — several same-due-date commitments from
+                        one person often share a leading phrase (e.g. "Nick to share the..."),
+                        so a truncated label would just repeat itself across bars anyway;
+                        the count is more honest about what's actually here. */}
+                    {row.endCol > row.startCol && (
+                      <span className="truncate text-[9px] font-semibold leading-none">
+                        {grouped ? `${row.commitments.length} items` : shortLabel(row.commitments[0].text)}
+                      </span>
+                    )}
+                    {grouped && (
+                      <ChevronDown className={cn("h-2.5 w-2.5 shrink-0 transition-transform", isOpen && "rotate-180")} aria-hidden="true" />
+                    )}
+                  </span>
+                </button>
+                {grouped && isOpen && (
+                  <div className="ml-[68px] space-y-0.5 border-l-2 border-border/60 pl-2">
+                    {row.commitments.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => onSelect(c.meeting.id)}
+                        className="block w-full truncate rounded py-0.5 text-left text-[10.5px] text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                        title={c.text}
+                      >
+                        {c.text}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

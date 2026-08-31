@@ -281,7 +281,8 @@ export function openCommitmentsDigest(meetings: Meeting[], stakeholders: Stakeho
 // derived view in the app. No LLM involved; read-only, click-through to the source meeting,
 // same interaction as CommitmentStrip's tiles right above it on Home.
 export interface WeekGanttRow {
-  commitment: OpenCommitment;
+  key: string; // stable within a render — otherParty + the bar's own span, for React keys and expand-state
+  commitments: OpenCommitment[]; // 1 or more — see the grouping comment below
   startCol: number; // 0-6, index into `days` — the meeting date, clamped into the window
   endCol: number; // 0-6, index into `days` — the due date, clamped into the window; overdue
                   // commitments clamp to column 0 ("today") rather than a past date off-grid
@@ -308,12 +309,27 @@ export function weekGanttData(meetings: Meeting[]): WeekGanttData {
     return b === "overdue" || b === "week";
   });
 
-  const rows: WeekGanttRow[] = sortByUrgency(candidates).map((commitment) => {
+  // Group commitments that would otherwise render as visually-identical bars: same
+  // counterparty, same start/end columns. A real, common shape this fixes — one meeting
+  // producing several same-due-date deliverables from one person (e.g. five things Nick owes
+  // by the same date) — used to render as N indistinguishable full-width bars with
+  // identically-truncated labels, since shortLabel() has no way to differentiate commitments
+  // that share a leading phrase. See master context §10.
+  const groups = new Map<string, { commitments: OpenCommitment[]; startCol: number; endCol: number; bucket: TileBucket }>();
+  const order: string[] = [];
+  sortByUrgency(candidates).forEach((commitment) => {
     const endCol = commitment.dueDate! < start ? 0 : Math.min(6, Math.max(0, dayIndexFrom(commitment.dueDate!)));
     const startCol = Math.min(Math.max(0, dayIndexFrom(commitment.meeting.date)), endCol);
     const { bucket } = dueTileInfo(commitment.dueDate);
-    return { commitment, startCol, endCol, bucket };
+    const key = `${otherParty(commitment) ?? "__self"}|${startCol}|${endCol}`;
+    if (!groups.has(key)) {
+      groups.set(key, { commitments: [], startCol, endCol, bucket });
+      order.push(key);
+    }
+    groups.get(key)!.commitments.push(commitment);
   });
+
+  const rows: WeekGanttRow[] = order.map((key) => ({ key, ...groups.get(key)! }));
 
   return { days, rows };
 }

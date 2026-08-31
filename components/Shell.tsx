@@ -69,7 +69,7 @@ function MobileShell({ children }: { children: React.ReactNode }) {
             </button>
             <button onClick={() => go({ screen: "home" })} className="flex items-baseline gap-1.5 text-[15px] font-bold tracking-tight">
               Orbit
-              <span className="text-[10.5px] font-medium text-muted-foreground/60">v1.16.0</span>
+              <span className="text-[10.5px] font-medium text-muted-foreground/60">v1.16.1</span>
             </button>
           </div>
           <span className="text-[11px] font-medium text-muted-foreground/70">{fmtToday()}</span>
@@ -138,7 +138,7 @@ function DesktopShell({ children }: { children: React.ReactNode }) {
       <aside className="flex w-[220px] shrink-0 flex-col overflow-y-auto border-r border-border">
         <button onClick={() => go({ screen: "home" })} className="flex items-baseline gap-1.5 px-5 py-5 text-left text-[17px] font-bold tracking-tight">
           Orbit
-          <span className="text-[11px] font-medium text-muted-foreground/60">v1.16.0</span>
+          <span className="text-[11px] font-medium text-muted-foreground/60">v1.16.1</span>
         </button>
 
         <nav className="flex flex-1 flex-col gap-0.5 px-2.5">
