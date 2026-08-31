@@ -4,7 +4,12 @@ export const runtime = "nodejs";
 
 const MODEL = process.env.ORBIT_MODEL || "claude-sonnet-4-6";
 
-async function callClaude(system: string, user: string, maxTokens = 1500): Promise<string> {
+// `content` is a plain string for every existing text-only task; extractSchedule (v1.15) is
+// the first caller that needs a multi-part content array (an image block plus a text
+// instruction), which is why this takes `unknown` rather than `string` — Anthropic's Messages
+// API accepts either shape identically, so one function serves both instead of a near-
+// duplicate "vision" variant.
+async function callClaude(system: string, content: string | unknown[], maxTokens = 1500): Promise<string> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("ANTHROPIC_API_KEY is not set on the server.");
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -18,7 +23,7 @@ async function callClaude(system: string, user: string, maxTokens = 1500): Promi
       model: MODEL,
       max_tokens: maxTokens,
       system,
-      messages: [{ role: "user", content: user }],
+      messages: [{ role: "user", content }],
     }),
   });
   if (!res.ok) {
@@ -137,6 +142,40 @@ List every meeting your answer draws from in "sources", most relevant first, cap
         throw new Error("The answer wasn't valid JSON. Please try asking again.");
       }
       return NextResponse.json({ result: parsed });
+    }
+
+    if (task === "extractSchedule") {
+      const imageBase64 = String(body.imageBase64 || "");
+      const mediaType = String(body.mediaType || "image/jpeg");
+      const today = String(body.today || new Date().toISOString().slice(0, 10));
+      if (!imageBase64) {
+        return NextResponse.json({ error: "No image provided." }, { status: 400 });
+      }
+      const system = `You are reading a photo or screenshot of Rohit's Outlook calendar (a work-week grid view). Today's date is ${today} — use it to resolve which year the visible dates belong to.
+The calendar may show several timezone reference columns on the left (e.g. London, New York, India) — always read event start/end times from the India (IND) column specifically, since that is Rohit's own timezone; the other columns are just reference labels and must be ignored for the actual time values.
+Extract every real, currently-scheduled meeting or event Rohit is attending. For each one, resolve:
+- "title": the event's own title text, as written.
+- "date": the calendar date this specific event falls on, YYYY-MM-DD, resolved from the day-of-week/date-number column header it sits under.
+- "startTime"/"endTime": 24-hour "HH:MM" India time, or null if genuinely not legible.
+- "attendees": every named attendee shown on the event, exactly as written (Outlook often shows "Last, First" — leave it as-is, that gets normalized afterward). Do not include Rohit himself.
+- "location": a room or venue string if one is shown, else null.
+Skip anything that is not a real attended meeting: out-of-office/"on leave" banners, cancelled events (often struck through or labeled "Cancelled:"), and all-day availability blocks.
+If a field is illegible (glare, angle, cut-off text), use null rather than guessing — never invent a plausible-looking value.
+Respond with ONLY valid JSON (no markdown, no commentary) in exactly this shape:
+{"meetings":[{"title":"...","date":"YYYY-MM-DD","startTime":"HH:MM or null","endTime":"HH:MM or null","attendees":["..."],"location":"... or null"}]}
+If you can't find any real meetings, return {"meetings":[]}.`;
+      const content = [
+        { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
+        { type: "text", text: "Extract the meetings from this calendar photo." },
+      ];
+      const raw = await callClaude(system, content, 3000);
+      let parsed;
+      try {
+        parsed = JSON.parse(stripFences(raw));
+      } catch {
+        throw new Error("The schedule response wasn't valid JSON. Please try again, or try a clearer photo.");
+      }
+      return NextResponse.json({ meetings: parsed.meetings ?? [] });
     }
 
     return NextResponse.json({ error: "Unknown task." }, { status: 400 });

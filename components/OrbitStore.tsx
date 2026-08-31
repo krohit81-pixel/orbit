@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import * as db from "@/lib/db";
 import { supabaseConfigured } from "@/lib/supabase/client";
 import { uid } from "@/lib/utils";
-import type { Meeting, ReviewModel, Stakeholder } from "@/lib/types";
+import type { Meeting, ReviewModel, ScheduleReviewItem, Stakeholder, UpcomingMeeting } from "@/lib/types";
 
 interface OrbitContextValue {
   ready: boolean;
@@ -13,6 +13,7 @@ interface OrbitContextValue {
   self: { name: string };
   stakeholders: Stakeholder[];
   meetings: Meeting[];
+  upcomingMeetings: UpcomingMeeting[];
   refresh: () => Promise<void>;
   addStakeholder: (s: Omit<Stakeholder, "id" | "summary">) => Promise<string>;
   saveStakeholder: (s: Stakeholder) => Promise<void>;
@@ -23,6 +24,9 @@ interface OrbitContextValue {
   toggleCommitment: (meetingId: string, commId: string) => Promise<void>;
   addCommitmentUpdate: (meetingId: string, commId: string, input: { note: string; date: string; newDueDate?: string | null; markDone?: boolean }) => Promise<void>;
   setSummary: (sid: string, summary: string) => Promise<void>;
+  commitSchedule: (items: ScheduleReviewItem[]) => Promise<void>;
+  saveUpcomingMeetingNotes: (id: string, notes: string) => Promise<void>;
+  deleteUpcomingMeeting: (id: string) => Promise<void>;
 }
 
 const Ctx = createContext<OrbitContextValue | null>(null);
@@ -32,11 +36,13 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [upcomingMeetings, setUpcomingMeetings] = useState<UpcomingMeeting[]>([]);
 
   const refresh = useCallback(async () => {
-    const { stakeholders, meetings } = await db.fetchAll();
+    const { stakeholders, meetings, upcomingMeetings } = await db.fetchAll();
     setStakeholders(stakeholders);
     setMeetings(meetings);
+    setUpcomingMeetings(upcomingMeetings);
   }, []);
 
   useEffect(() => {
@@ -216,10 +222,124 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
     await db.updateStakeholder(sid, { summary, summaryGeneratedAt: stamp });
   }, []);
 
+  // Applies the owner's reviewed schedule-import decisions (v1.15) — nothing from
+  // extractSchedule ever reaches Supabase before this runs. "new" items (and "uncertain"
+  // ones resolved as "new") insert a fresh row; "updated" items (and "uncertain" ones
+  // resolved as "update") patch the existing row's date/time/attendees/location only —
+  // the owner's own `notes` on that record are never touched by an import.
+  //
+  // Every write is caught individually and rolled back on failure (same optimistic-then-
+  // rollback shape as toggleCommitment/addCommitmentUpdate) rather than left to reject
+  // unhandled — this surfaced as a real gap while verifying the feature against the actual
+  // Supabase project before the orbit.upcoming_meetings migration had been run: the insert
+  // failed, and with no catch here the owner would have been left on the Review screen with
+  // no feedback at all that nothing was saved. The alert names the likely cause (the
+  // migration not run yet) explicitly, since that's the one failure mode every first use of
+  // this feature will hit until the owner runs it once.
+  const commitSchedule = useCallback(async (items: ScheduleReviewItem[]) => {
+    const toInsert: UpcomingMeeting[] = [];
+    const toUpdate: { id: string; patch: Partial<UpcomingMeeting> }[] = [];
+    const stamp = new Date().toISOString();
+
+    items.filter((it) => it.include).forEach((it) => {
+      const asNew = it.kind === "new" || (it.kind === "uncertain" && it.resolution === "new");
+      if (asNew) {
+        toInsert.push({
+          id: uid(),
+          title: it.extracted.title,
+          date: it.extracted.date,
+          startTime: it.extracted.startTime,
+          endTime: it.extracted.endTime,
+          attendees: it.extracted.attendees,
+          location: it.extracted.location,
+          notes: null,
+          createdAt: stamp,
+          updatedAt: stamp,
+        });
+      } else if (it.existing) {
+        toUpdate.push({
+          id: it.existing.id,
+          patch: {
+            date: it.extracted.date,
+            startTime: it.extracted.startTime,
+            endTime: it.extracted.endTime,
+            attendees: it.extracted.attendees,
+            location: it.extracted.location,
+            updatedAt: stamp,
+          },
+        });
+      }
+    });
+
+    let failCount = 0;
+
+    if (toInsert.length) {
+      setUpcomingMeetings((prev) => [...prev, ...toInsert].sort((a, b) => a.date.localeCompare(b.date)));
+      const results = await Promise.allSettled(toInsert.map((u) => db.insertUpcomingMeeting(u)));
+      const failedIds = new Set(toInsert.filter((_, i) => results[i].status === "rejected").map((u) => u.id));
+      if (failedIds.size) {
+        failCount += failedIds.size;
+        setUpcomingMeetings((prev) => prev.filter((u) => !failedIds.has(u.id)));
+      }
+    }
+    for (const { id, patch } of toUpdate) {
+      let prev: UpcomingMeeting | undefined;
+      setUpcomingMeetings((list) => list.map((u) => {
+        if (u.id !== id) return u;
+        prev = u;
+        return { ...u, ...patch };
+      }));
+      try {
+        await db.updateUpcomingMeeting(id, {
+          date: patch.date, start_time: patch.startTime, end_time: patch.endTime,
+          attendees: patch.attendees, location: patch.location, updated_at: patch.updatedAt,
+        });
+      } catch {
+        failCount++;
+        if (prev) {
+          const restored = prev;
+          setUpcomingMeetings((list) => list.map((u) => (u.id === id ? restored : u)));
+        }
+      }
+    }
+
+    if (failCount > 0 && typeof window !== "undefined") {
+      window.alert(
+        `Couldn't save ${failCount} meeting${failCount === 1 ? "" : "s"}.\n\n` +
+        `If this is your first time importing a calendar, you likely need to run ` +
+        `supabase/migrations/004_add_upcoming_meetings.sql once in the Supabase SQL editor, ` +
+        `then try importing again.`
+      );
+    }
+  }, []);
+
+  const saveUpcomingMeetingNotes = useCallback(async (id: string, notes: string) => {
+    const stamp = new Date().toISOString();
+    let prevNotes: string | null | undefined;
+    setUpcomingMeetings((prev) => prev.map((u) => {
+      if (u.id !== id) return u;
+      prevNotes = u.notes;
+      return { ...u, notes, updatedAt: stamp };
+    }));
+    try {
+      await db.updateUpcomingMeeting(id, { notes, updated_at: stamp });
+    } catch (e) {
+      setUpcomingMeetings((prev) => prev.map((u) => (u.id === id ? { ...u, notes: prevNotes ?? null } : u)));
+      const msg = e instanceof Error ? e.message : "Could not save this note.";
+      if (typeof window !== "undefined") window.alert(`Couldn't save: ${msg}\nYour note was not saved — please try again.`);
+    }
+  }, []);
+
+  const deleteUpcomingMeeting = useCallback(async (id: string) => {
+    setUpcomingMeetings((prev) => prev.filter((u) => u.id !== id));
+    await db.deleteUpcomingMeeting(id);
+  }, []);
+
   const value: OrbitContextValue = {
     ready, configured: supabaseConfigured, error, self: { name: "Rohit" },
-    stakeholders, meetings, refresh, addStakeholder, saveStakeholder, deleteStakeholder,
+    stakeholders, meetings, upcomingMeetings, refresh, addStakeholder, saveStakeholder, deleteStakeholder,
     commitMeeting, saveMeeting, deleteMeeting, toggleCommitment, addCommitmentUpdate, setSummary,
+    commitSchedule, saveUpcomingMeetingNotes, deleteUpcomingMeeting,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

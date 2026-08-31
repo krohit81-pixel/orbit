@@ -163,3 +163,65 @@ export interface ReviewModel {
   commitmentSuggestions: ReviewCommitmentSuggestion[];
   transcript?: string; // the raw pasted text this review was extracted from
 }
+
+// --- upcoming (scheduled) meetings, imported from a calendar photo (v1.15) ---
+// A deliberately separate, lighter entity from Meeting: no transcript, no extracted
+// intelligence (topics/expectations/commitments/concerns) — just what's on the calendar,
+// plus a place for the owner's own prep notes. Never auto-converted into a Meeting once its
+// date passes; it just drops off the "Upcoming" list (see lib/utils selectors). Attendees are
+// stored as raw names, not yet resolved to Stakeholder ids — linking them is a natural next
+// step once this proves out, deliberately not built in v1.
+export interface UpcomingMeeting {
+  id: string;
+  title: string;
+  date: string; // ISO yyyy-mm-dd
+  startTime: string | null; // "HH:MM", 24h
+  endTime: string | null;
+  attendees: string[]; // "First Last" order, as read off the calendar
+  location: string | null;
+  notes: string | null; // free text, owner-editable any time — same shape as Meeting.transcript
+  createdAt: string; // ISO timestamp
+  updatedAt: string; // ISO timestamp
+}
+
+// What the vision-based "extractSchedule" LLM task returns for ONE entry it read off the
+// calendar photo. Purely descriptive — this task never sees existing UpcomingMeeting data,
+// so it has no way to judge "is this the same as something I already have"; that matching
+// happens afterward, deterministically, in lib/utils.matchSchedule() (same "code for facts,
+// model for judgment" split as everywhere else in the app — here the "judgment" is just
+// reading the image, there's no facts/judgment split within the task itself).
+export interface ExtractedScheduleItem {
+  title: string;
+  date: string; // ISO yyyy-mm-dd, resolved from the calendar's own day-of-week/date headers
+  startTime: string | null;
+  endTime: string | null;
+  attendees: string[];
+  location: string | null;
+}
+
+// The outcome of matching one extracted item against real, already-stored UpcomingMeetings
+// (matchSchedule(), lib/utils.ts). "new" and "updated" are auto-classified with reasonable
+// confidence; "uncertain" is anything the deterministic matcher isn't confident enough to
+// decide on its own (see matchSchedule's own comment for exactly which cases land here) —
+// the review screen always surfaces these as an explicit choice, never a silent guess.
+// "unchanged" matches are filtered out before the review list is built (see
+// ScheduleMatchResult) rather than shown as a fourth reviewable kind — there's nothing to
+// review about an entry that's already correct.
+export type ScheduleMatchKind = "new" | "updated" | "uncertain";
+export interface ScheduleReviewItem extends ReviewItem {
+  kind: ScheduleMatchKind;
+  extracted: ExtractedScheduleItem;
+  // The real, current record this maps to (set for "updated" and "uncertain", null for
+  // "new") — shown so a proposed time/date change is always a real before/after pulled from
+  // OUR data, never the model's own restated version of what changed.
+  existing: UpcomingMeeting | null;
+  // Only meaningful for "uncertain": how the owner wants to resolve it once they've looked at
+  // the before/after. Defaults to "update" (a same-title, different-date near-match is most
+  // often a genuine reschedule) but the owner can flip it to "new" (a fresh occurrence — the
+  // common case for a recurring meeting) before committing.
+  resolution?: "update" | "new";
+}
+export interface ScheduleMatchResult {
+  items: ScheduleReviewItem[]; // new + updated + uncertain, ready for the review screen
+  unchangedCount: number; // already recorded, identical — silently skipped, just reported
+}

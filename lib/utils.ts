@@ -1,6 +1,9 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { Commitment, CommitmentUpdate, Concern, Expectation, Meeting, Relationship, Stakeholder } from "./types";
+import type {
+  Commitment, CommitmentUpdate, Concern, Expectation, ExtractedScheduleItem, Meeting,
+  Relationship, ScheduleMatchResult, ScheduleReviewItem, Stakeholder, UpcomingMeeting,
+} from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -47,6 +50,16 @@ export const fmtToday = (): string =>
 // far that wants just the day name without a date attached.
 export const fmtWeekdayShort = (s: string): string =>
   new Date(s + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short" });
+// "14:00" -> "2:00 PM" — for upcoming-meeting times (v1.15), stored as plain 24h "HH:MM"
+// strings (no timezone of their own, same as every other date/time field in this app).
+export function fmtTime12h(hhmm?: string | null): string | null {
+  if (!hhmm) return null;
+  const [h, m] = hhmm.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
 export const isOverdue = (s?: string | null): boolean => bucketDue(s) === "overdue";
 
 // `iso` is a plain calendar date with no timezone of its own — done entirely in UTC (parse as
@@ -200,6 +213,20 @@ const LABEL_FILLER = /^(rohit will |rohit to |rohit is going to |i will |i'll |y
 export function shortLabel(text: string, maxWords = 4): string {
   const stripped = text.replace(LABEL_FILLER, "").trim();
   return stripped.split(/\s+/).slice(0, maxWords).join(" ");
+}
+
+// Outlook shows attendee names as "Last, First" in its calendar grid; the extractSchedule
+// prompt (v1.15) asks the model to flip that to "First Last", but verifying against a real
+// photo showed it doesn't reliably follow that instruction — names came back unflipped. Doing
+// it deterministically here instead, rather than leaning harder on the prompt, since this is
+// a pure text transformation with no judgment involved (exactly the kind of thing that
+// shouldn't be left to the model once a reliable rule exists — see master context §6's
+// "code for facts, model for judgment" split). Only touches strings that actually look like
+// "Word, Word" — anything else (a name the model already flipped, or one with no comma at
+// all) passes through unchanged.
+export function normalizeAttendeeName(name: string): string {
+  const m = name.trim().match(/^([A-Za-z'-]+),\s*([A-Za-z'-]+)$/);
+  return m ? `${m[2]} ${m[1]}` : name.trim();
 }
 // The other party from the user's perspective (for grouping); null if third-party.
 export function otherParty(c: Commitment): string | null {
@@ -677,4 +704,66 @@ export function assistantDigest(meetings: Meeting[], stakeholders: Stakeholder[]
     lines.push("");
   });
   return lines.join("\n");
+}
+
+// ---- upcoming meetings / schedule import (v1.15) ----
+// Deterministic matcher: given what the "extractSchedule" vision task read off a calendar
+// photo, decide for each entry whether it's already recorded (skip), a change to something
+// already recorded (propose an update), or genuinely new — WITHOUT ever asking the model to
+// make that judgment (it never sees existing data, see ExtractedScheduleItem in lib/types).
+// The screenshot is a partial, additive slice of the calendar (Outlook's week view only shows
+// a few days), never a full replacement dump — so an existing UpcomingMeeting simply absent
+// from the current batch is left completely untouched, never deleted or flagged.
+//
+// Recurring meetings ("Catchup Tim & Rohit" every week) are the reason this is more careful
+// than "match on title": if matching ignored date, a fresh week's occurrence of a recurring
+// meeting would look identical to an old one and get silently merged into it, losing the
+// older entry's own date/notes. So:
+//   - same normalized title + same date: same time -> "unchanged" (skip); different time ->
+//     "updated" (a same-day retime, e.g. moved from 10am to 2pm).
+//   - same normalized title + a DIFFERENT date, and exactly ONE such existing entry -> likely
+//     a genuine reschedule, but "uncertain" rather than auto-applied — the owner sees the real
+//     before/after and decides. (If there are multiple same-title entries on other dates
+//     already, e.g. a recurring series with more than one occurrence stored, treating any of
+//     them as "the one that moved" would be a guess with real downside, so this case falls
+//     through to "new" instead — each occurrence keeps its own row, which is the right
+//     default for a recurring meeting anyway.)
+//   - a close-but-not-exact title match (similar(), the same heuristic concern-recurrence
+//     already uses) on any date -> "uncertain".
+//   - nothing matches -> "new".
+export function matchSchedule(extracted: ExtractedScheduleItem[], existing: UpcomingMeeting[]): ScheduleMatchResult {
+  const items: ScheduleReviewItem[] = [];
+  let unchangedCount = 0;
+
+  extracted.forEach((ex) => {
+    const exTitle = norm(ex.title);
+    const sameTitle = existing.filter((u) => norm(u.title) === exTitle);
+    const sameTitleSameDate = sameTitle.find((u) => u.date === ex.date);
+
+    if (sameTitleSameDate) {
+      const timeSame = sameTitleSameDate.startTime === ex.startTime && sameTitleSameDate.endTime === ex.endTime;
+      if (timeSame) {
+        unchangedCount++;
+      } else {
+        items.push({ _id: uid(), include: true, kind: "updated", extracted: ex, existing: sameTitleSameDate });
+      }
+      return;
+    }
+
+    const sameTitleOtherDate = sameTitle.filter((u) => u.date !== ex.date);
+    if (sameTitleOtherDate.length === 1) {
+      items.push({ _id: uid(), include: true, kind: "uncertain", extracted: ex, existing: sameTitleOtherDate[0], resolution: "update" });
+      return;
+    }
+    if (sameTitleOtherDate.length === 0) {
+      const fuzzy = existing.find((u) => similar(u.title, ex.title));
+      if (fuzzy) {
+        items.push({ _id: uid(), include: true, kind: "uncertain", extracted: ex, existing: fuzzy, resolution: "update" });
+        return;
+      }
+    }
+    items.push({ _id: uid(), include: true, kind: "new", extracted: ex, existing: null });
+  });
+
+  return { items, unchangedCount };
 }

@@ -17,9 +17,14 @@ import { CaptureScreen } from "./screens/Capture";
 import { ReviewScreen } from "./screens/Review";
 import { SearchScreen } from "./screens/Search";
 import { WeeklyReportScreen } from "./screens/WeeklyReport";
+import { ImportScheduleScreen } from "./screens/ImportSchedule";
+import { ScheduleReviewScreen } from "./screens/ScheduleReview";
 import { Spinner } from "./bits";
-import { allOpenCommitments, commitmentLabel, openCommitmentsDigest, todayISO, uid } from "@/lib/utils";
-import type { Extraction, Meeting, ReviewCommitmentSuggestion, ReviewModel, ReviewPerson, Stakeholder } from "@/lib/types";
+import { allOpenCommitments, commitmentLabel, matchSchedule, normalizeAttendeeName, openCommitmentsDigest, todayISO, uid } from "@/lib/utils";
+import type {
+  Extraction, ExtractedScheduleItem, Meeting, ReviewCommitmentSuggestion, ReviewModel,
+  ReviewPerson, ScheduleReviewItem, Stakeholder,
+} from "@/lib/types";
 
 function buildReview(
   ex: Extraction,
@@ -112,6 +117,10 @@ function Inner() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [review, setReview] = useState<ReviewModel | null>(null);
+  const [scheduleBusy, setScheduleBusy] = useState(false);
+  const [scheduleErr, setScheduleErr] = useState("");
+  const [scheduleReview, setScheduleReview] = useState<ScheduleReviewItem[] | null>(null);
+  const [scheduleUnchangedCount, setScheduleUnchangedCount] = useState(0);
 
   const knownNames = () => new Set(store.stakeholders.map((s) => s.name.toLowerCase().trim()));
 
@@ -170,7 +179,54 @@ function Inner() {
     setView({ screen: "meetings" });
   };
 
-  const flow: Flow = { view, go: setView, draft, setDraft, meetingDate, setMeetingDate, busy, err, review, setReview, runExtraction, loadSample, commit };
+  // Vision-based schedule import (v1.15). extractSchedule only reads the photo — it never
+  // sees store.upcomingMeetings — so all "is this already recorded / has it changed" judgment
+  // happens here, deterministically, via matchSchedule(). See that function's own comment for
+  // the exact matching rules (recurring-meeting-safe: same title on a different date needs a
+  // single unambiguous candidate before it's even offered as a possible reschedule).
+  const runScheduleExtraction = async (imageBase64: string, mediaType: string) => {
+    setScheduleErr("");
+    setScheduleBusy(true);
+    try {
+      const res = await fetch("/api/llm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ task: "extractSchedule", imageBase64, mediaType, today: todayISO() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't read the calendar photo.");
+      // The model is asked to flip Outlook's "Last, First" display order to "First Last", but
+      // verifying against a real photo showed it doesn't reliably do that — normalizeAttendeeName()
+      // does it deterministically instead (pure text transform, no judgment involved).
+      const extracted = ((data.meetings || []) as ExtractedScheduleItem[]).map((m) => ({
+        ...m,
+        attendees: m.attendees.map(normalizeAttendeeName),
+      }));
+      const { items, unchangedCount } = matchSchedule(extracted, store.upcomingMeetings);
+      setScheduleReview(items);
+      setScheduleUnchangedCount(unchangedCount);
+      setView({ screen: "scheduleReview" });
+    } catch (e) {
+      setScheduleErr(e instanceof Error ? e.message : "Couldn't read the calendar photo.");
+    } finally {
+      setScheduleBusy(false);
+    }
+  };
+
+  const commitSchedule = async () => {
+    if (!scheduleReview) return;
+    await store.commitSchedule(scheduleReview);
+    setScheduleReview(null);
+    setScheduleUnchangedCount(0);
+    setView({ screen: "meetings" });
+  };
+
+  const flow: Flow = {
+    view, go: setView, draft, setDraft, meetingDate, setMeetingDate, busy, err, review, setReview, runExtraction, loadSample, commit,
+    scheduleBusy, scheduleErr, scheduleReview, scheduleUnchangedCount,
+    setScheduleReview: (items) => setScheduleReview(items),
+    runScheduleExtraction, commitSchedule,
+  };
 
   let body: React.ReactNode;
   switch (view.screen) {
@@ -187,6 +243,8 @@ function Inner() {
     case "review": body = <ReviewScreen />; break;
     case "search": body = <SearchScreen />; break;
     case "weeklyReport": body = <WeeklyReportScreen />; break;
+    case "importSchedule": body = <ImportScheduleScreen />; break;
+    case "scheduleReview": body = <ScheduleReviewScreen />; break;
     default: body = <HomeScreen />;
   }
 

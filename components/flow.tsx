@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext } from "react";
-import type { ReviewModel } from "@/lib/types";
+import type { ReviewModel, ScheduleReviewItem } from "@/lib/types";
 
 export type View =
   | { screen: "home" }
@@ -15,7 +15,9 @@ export type View =
   | { screen: "meeting"; id: string }
   | { screen: "editMeeting"; id: string }
   | { screen: "meetingPrint"; id: string }
-  | { screen: "weeklyReport" };
+  | { screen: "weeklyReport" }
+  | { screen: "importSchedule" }
+  | { screen: "scheduleReview" };
 
 export interface Flow {
   view: View;
@@ -31,6 +33,17 @@ export interface Flow {
   runExtraction: () => Promise<void>;
   loadSample: () => void;
   commit: () => Promise<void>;
+  // Schedule-import wizard (v1.15) — deliberately separate state from the transcript
+  // capture/review flow above (different input shape, different review model), following
+  // the same "one flow object holds every screen's cross-cutting state" convention rather
+  // than introducing a second context for one more wizard.
+  scheduleBusy: boolean;
+  scheduleErr: string;
+  scheduleReview: ScheduleReviewItem[] | null;
+  scheduleUnchangedCount: number;
+  setScheduleReview: (items: ScheduleReviewItem[]) => void;
+  runScheduleExtraction: (imageBase64: string, mediaType: string) => Promise<void>;
+  commitSchedule: () => Promise<void>;
 }
 
 export const FlowCtx = createContext<Flow | null>(null);

@@ -1,6 +1,6 @@
 import { supabase } from "./supabase/client";
 import { seedData } from "./seed";
-import type { Commitment, Meeting, Stakeholder } from "./types";
+import type { Commitment, Meeting, Stakeholder, UpcomingMeeting } from "./types";
 import { SELF } from "./utils";
 
 const USER = "rohit"; // single-user V1; becomes auth.uid() when auth is added
@@ -15,12 +15,18 @@ type MeetingRow = {
   topics: unknown; mentioned: unknown; expectations: unknown; commitments: unknown;
   concerns: unknown; decisions: unknown; action_items: unknown; transcript: string | null;
 };
+type UpcomingMeetingRow = {
+  id: string; title: string; date: string; start_time: string | null; end_time: string | null;
+  attendees: unknown; location: string | null; notes: string | null;
+  created_at: string; updated_at: string;
+};
 
 // `shared` schema holds tables also read by other apps on this Supabase project
 // (currently just Risk Dashboard, in its own `risk_dashboard` schema).
 // `orbit` schema holds tables specific to this app.
 const stakeholdersTable = () => supabase.schema("shared").from("stakeholders");
 const meetingsTable = () => supabase.schema("orbit").from("meetings");
+const upcomingMeetingsTable = () => supabase.schema("orbit").from("upcoming_meetings");
 
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
@@ -104,16 +110,39 @@ function meetingRow(m: Meeting) {
     transcript: m.transcript ?? null,
   };
 }
+function toUpcomingMeeting(r: UpcomingMeetingRow): UpcomingMeeting {
+  return {
+    id: r.id,
+    title: r.title,
+    date: r.date,
+    startTime: r.start_time,
+    endTime: r.end_time,
+    attendees: arr<string>(r.attendees),
+    location: r.location,
+    notes: r.notes,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+function upcomingMeetingRow(u: UpcomingMeeting) {
+  return {
+    id: u.id, user_id: USER, title: u.title, date: u.date,
+    start_time: u.startTime, end_time: u.endTime, attendees: u.attendees,
+    location: u.location, notes: u.notes, updated_at: u.updatedAt,
+  };
+}
 
 // ---- reads ----
-export async function fetchAll(): Promise<{ stakeholders: Stakeholder[]; meetings: Meeting[] }> {
-  const [{ data: s }, { data: m }] = await Promise.all([
+export async function fetchAll(): Promise<{ stakeholders: Stakeholder[]; meetings: Meeting[]; upcomingMeetings: UpcomingMeeting[] }> {
+  const [{ data: s }, { data: m }, { data: u }] = await Promise.all([
     stakeholdersTable().select("*").eq("user_id", USER),
     meetingsTable().select("*").eq("user_id", USER).order("date", { ascending: false }),
+    upcomingMeetingsTable().select("*").eq("user_id", USER).order("date", { ascending: true }),
   ]);
   return {
     stakeholders: (s as StakeholderRow[] | null ?? []).map(toStakeholder),
     meetings: (m as MeetingRow[] | null ?? []).map(toMeeting),
+    upcomingMeetings: (u as UpcomingMeetingRow[] | null ?? []).map(toUpcomingMeeting),
   };
 }
 
@@ -144,6 +173,16 @@ export async function saveMeeting(m: Meeting) {
 }
 export async function deleteMeeting(id: string) {
   check("deleteMeeting", (await meetingsTable().delete().eq("id", id).eq("user_id", USER)).error);
+}
+
+export async function insertUpcomingMeeting(u: UpcomingMeeting) {
+  check("insertUpcomingMeeting", (await upcomingMeetingsTable().insert(upcomingMeetingRow(u))).error);
+}
+export async function updateUpcomingMeeting(id: string, patch: Partial<ReturnType<typeof upcomingMeetingRow>>) {
+  check("updateUpcomingMeeting", (await upcomingMeetingsTable().update(patch).eq("id", id).eq("user_id", USER)).error);
+}
+export async function deleteUpcomingMeeting(id: string) {
+  check("deleteUpcomingMeeting", (await upcomingMeetingsTable().delete().eq("id", id).eq("user_id", USER)).error);
 }
 
 export async function updateStakeholder(
