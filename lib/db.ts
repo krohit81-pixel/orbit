@@ -1,6 +1,6 @@
 import { supabase } from "./supabase/client";
 import { seedData } from "./seed";
-import type { Commitment, Meeting, Stakeholder, UpcomingMeeting } from "./types";
+import type { Commitment, Extraction, Meeting, PendingMeetingReview, Stakeholder, UpcomingMeeting } from "./types";
 import { SELF } from "./utils";
 
 const USER = "rohit"; // single-user V1; becomes auth.uid() when auth is added
@@ -20,6 +20,11 @@ type UpcomingMeetingRow = {
   attendees: unknown; location: string | null; notes: string | null;
   created_at: string; updated_at: string;
 };
+type PendingMeetingReviewRow = {
+  id: string; source_upcoming_meeting_id: string | null; title: string; date: string;
+  start_time: string | null; end_time: string | null; attendees: unknown; location: string | null;
+  notes: string | null; extraction: unknown; created_at: string;
+};
 
 // `shared` schema holds tables also read by other apps on this Supabase project
 // (currently just Risk Dashboard, in its own `risk_dashboard` schema).
@@ -27,6 +32,7 @@ type UpcomingMeetingRow = {
 const stakeholdersTable = () => supabase.schema("shared").from("stakeholders");
 const meetingsTable = () => supabase.schema("orbit").from("meetings");
 const upcomingMeetingsTable = () => supabase.schema("orbit").from("upcoming_meetings");
+const pendingMeetingReviewsTable = () => supabase.schema("orbit").from("pending_meeting_reviews");
 
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
@@ -131,18 +137,45 @@ function upcomingMeetingRow(u: UpcomingMeeting) {
     location: u.location, notes: u.notes, updated_at: u.updatedAt,
   };
 }
+function toPendingMeetingReview(r: PendingMeetingReviewRow): PendingMeetingReview {
+  return {
+    id: r.id,
+    sourceUpcomingMeetingId: r.source_upcoming_meeting_id,
+    title: r.title,
+    date: r.date,
+    startTime: r.start_time,
+    endTime: r.end_time,
+    attendees: arr<string>(r.attendees),
+    location: r.location,
+    notes: r.notes,
+    extraction: (r.extraction ?? {}) as Extraction,
+    createdAt: r.created_at,
+  };
+}
+function pendingMeetingReviewRow(p: PendingMeetingReview) {
+  return {
+    id: p.id, user_id: USER, source_upcoming_meeting_id: p.sourceUpcomingMeetingId,
+    title: p.title, date: p.date, start_time: p.startTime, end_time: p.endTime,
+    attendees: p.attendees, location: p.location, notes: p.notes,
+    extraction: p.extraction, created_at: p.createdAt,
+  };
+}
 
 // ---- reads ----
-export async function fetchAll(): Promise<{ stakeholders: Stakeholder[]; meetings: Meeting[]; upcomingMeetings: UpcomingMeeting[] }> {
-  const [{ data: s }, { data: m }, { data: u }] = await Promise.all([
+export async function fetchAll(): Promise<{
+  stakeholders: Stakeholder[]; meetings: Meeting[]; upcomingMeetings: UpcomingMeeting[]; pendingMeetingReviews: PendingMeetingReview[];
+}> {
+  const [{ data: s }, { data: m }, { data: u }, { data: p }] = await Promise.all([
     stakeholdersTable().select("*").eq("user_id", USER),
     meetingsTable().select("*").eq("user_id", USER).order("date", { ascending: false }),
     upcomingMeetingsTable().select("*").eq("user_id", USER).order("date", { ascending: true }),
+    pendingMeetingReviewsTable().select("*").eq("user_id", USER).order("date", { ascending: true }),
   ]);
   return {
     stakeholders: (s as StakeholderRow[] | null ?? []).map(toStakeholder),
     meetings: (m as MeetingRow[] | null ?? []).map(toMeeting),
     upcomingMeetings: (u as UpcomingMeetingRow[] | null ?? []).map(toUpcomingMeeting),
+    pendingMeetingReviews: (p as PendingMeetingReviewRow[] | null ?? []).map(toPendingMeetingReview),
   };
 }
 
@@ -183,6 +216,21 @@ export async function updateUpcomingMeeting(id: string, patch: Partial<ReturnTyp
 }
 export async function deleteUpcomingMeeting(id: string) {
   check("deleteUpcomingMeeting", (await upcomingMeetingsTable().delete().eq("id", id).eq("user_id", USER)).error);
+}
+
+// Elapsed (date < cutoff) upcoming meetings — used by the overnight
+// process-elapsed-meetings cron, not by the normal client UI.
+export async function fetchElapsedUpcomingMeetings(cutoffISO: string): Promise<UpcomingMeeting[]> {
+  const { data, error } = await upcomingMeetingsTable().select("*").eq("user_id", USER).lt("date", cutoffISO);
+  check("fetchElapsedUpcomingMeetings", error);
+  return (data as UpcomingMeetingRow[] | null ?? []).map(toUpcomingMeeting);
+}
+
+export async function insertPendingMeetingReview(p: PendingMeetingReview) {
+  check("insertPendingMeetingReview", (await pendingMeetingReviewsTable().insert(pendingMeetingReviewRow(p))).error);
+}
+export async function deletePendingMeetingReview(id: string) {
+  check("deletePendingMeetingReview", (await pendingMeetingReviewsTable().delete().eq("id", id).eq("user_id", USER)).error);
 }
 
 export async function updateStakeholder(
