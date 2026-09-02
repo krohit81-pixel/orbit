@@ -29,6 +29,7 @@ interface OrbitContextValue {
   setSummary: (sid: string, summary: string) => Promise<void>;
   commitSchedule: (items: ScheduleReviewItem[]) => Promise<void>;
   saveUpcomingMeetingNotes: (id: string, notes: string) => Promise<void>;
+  updateUpcomingMeetingSchedule: (id: string, patch: { date: string; startTime: string | null; endTime: string | null }) => Promise<void>;
   deleteUpcomingMeeting: (id: string) => Promise<void>;
   // Removes a staged PendingMeetingReview row — used both when the owner discards one outright
   // and, after a successful commitMeeting(), to clear the staging row an accepted one leaves
@@ -390,6 +391,27 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
     await db.deleteUpcomingMeeting(id);
   }, []);
 
+  // Manual correction for a rescheduled upcoming meeting (v1.17.1) — the calendar-photo
+  // import already covers "this changed since the last photo" via matchSchedule(); this is
+  // the direct "I know it moved, let me just fix it" path for a same-week change the owner
+  // already knows about. Same optimistic-then-rollback shape as saveUpcomingMeetingNotes.
+  const updateUpcomingMeetingSchedule = useCallback(async (id: string, patch: { date: string; startTime: string | null; endTime: string | null }) => {
+    const stamp = new Date().toISOString();
+    let prev: UpcomingMeeting | undefined;
+    setUpcomingMeetings((prevList) => prevList.map((u) => {
+      if (u.id !== id) return u;
+      prev = u;
+      return { ...u, date: patch.date, startTime: patch.startTime, endTime: patch.endTime, updatedAt: stamp };
+    }));
+    try {
+      await db.updateUpcomingMeeting(id, { date: patch.date, start_time: patch.startTime, end_time: patch.endTime, updated_at: stamp });
+    } catch (e) {
+      setUpcomingMeetings((prevList) => prevList.map((u) => (u.id === id && prev ? prev : u)));
+      const msg = e instanceof Error ? e.message : "Could not save this change.";
+      if (typeof window !== "undefined") window.alert(`Couldn't save: ${msg}\nYour change was not saved — please try again.`);
+    }
+  }, []);
+
   const deletePendingMeetingReview = useCallback(async (id: string) => {
     setPendingMeetingReviews((prev) => prev.filter((p) => p.id !== id));
     await db.deletePendingMeetingReview(id);
@@ -399,7 +421,7 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
     ready, configured: supabaseConfigured, error, self: { name: "Rohit" },
     stakeholders, meetings, upcomingMeetings, pendingMeetingReviews, refresh, addStakeholder, saveStakeholder, deleteStakeholder,
     commitMeeting, saveMeeting, deleteMeeting, toggleCommitment, resolveConcern, reopenConcern, addCommitmentUpdate, setSummary,
-    commitSchedule, saveUpcomingMeetingNotes, deleteUpcomingMeeting, deletePendingMeetingReview,
+    commitSchedule, saveUpcomingMeetingNotes, updateUpcomingMeetingSchedule, deleteUpcomingMeeting, deletePendingMeetingReview,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
