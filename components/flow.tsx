@@ -42,6 +42,7 @@ export interface Flow {
   scheduleErr: string;
   scheduleReview: ScheduleReviewItem[] | null;
   scheduleUnchangedCount: number;
+  scheduleSkippedPastCount: number;
   setScheduleReview: (items: ScheduleReviewItem[]) => void;
   runScheduleExtraction: (imageBase64: string, mediaType: string) => Promise<void>;
   commitSchedule: () => Promise<void>;

@@ -234,6 +234,12 @@ export interface ScheduleReviewItem extends ReviewItem {
 export interface ScheduleMatchResult {
   items: ScheduleReviewItem[]; // new + updated + uncertain, ready for the review screen
   unchangedCount: number; // already recorded, identical — silently skipped, just reported
+  // v1.17.2: a photo naturally includes a few already-elapsed days at the start of the week —
+  // these are never matched/proposed (an "Upcoming" entry for something that already happened
+  // makes no sense, and re-adding one the overnight cron already closed out would resurrect a
+  // stale duplicate), just counted so the owner isn't left wondering why an earlier day didn't
+  // show up in the review.
+  skippedPastCount: number;
 }
 
 // --- overnight meeting close-out (v1.16) ---

@@ -775,7 +775,19 @@ export function matchSchedule(extracted: ExtractedScheduleItem[], existing: Upco
   const items: ScheduleReviewItem[] = [];
   let unchangedCount = 0;
 
-  extracted.forEach((ex) => {
+  // Future dates only (v1.17.2): a photo of "this week" naturally includes a day or two
+  // already behind us, and extractSchedule has no reason to know that — it just reads what's
+  // on the grid. Matching one of those against existing data would either resurrect a stale
+  // Upcoming entry the overnight cron already closed out (deleted, staged as a
+  // PendingMeetingReview) as a brand-new "new" item, or propose an "update" to a real meeting
+  // that's already happened. Neither is ever the right outcome, so past-dated extractions are
+  // dropped before matching even starts — counted, not silently discarded, so the owner isn't
+  // left wondering why an earlier day's meeting didn't show up in the review.
+  const today = todayISO();
+  const upcoming = extracted.filter((ex) => ex.date >= today);
+  const skippedPastCount = extracted.length - upcoming.length;
+
+  upcoming.forEach((ex) => {
     const exTitle = norm(ex.title);
     const sameTitle = existing.filter((u) => norm(u.title) === exTitle);
     const sameTitleSameDate = sameTitle.find((u) => u.date === ex.date);
@@ -805,5 +817,5 @@ export function matchSchedule(extracted: ExtractedScheduleItem[], existing: Upco
     items.push({ _id: uid(), include: true, kind: "new", extracted: ex, existing: null });
   });
 
-  return { items, unchangedCount };
+  return { items, unchangedCount, skippedPastCount };
 }

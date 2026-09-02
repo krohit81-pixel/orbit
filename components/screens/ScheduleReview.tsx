@@ -63,7 +63,7 @@ function EntrySummary({ e, onTimeChange }: { e: ExtractedScheduleItem; onTimeCha
 }
 
 export function ScheduleReviewScreen() {
-  const { go, scheduleReview, setScheduleReview, scheduleUnchangedCount, commitSchedule } = useFlow();
+  const { go, scheduleReview, setScheduleReview, scheduleUnchangedCount, scheduleSkippedPastCount, commitSchedule } = useFlow();
 
   if (!scheduleReview) return <div className="py-10 text-center text-muted-foreground">Nothing to review.</div>;
 
@@ -92,6 +92,8 @@ export function ScheduleReviewScreen() {
         <div className="py-10 text-center text-muted-foreground">
           {scheduleUnchangedCount > 0
             ? `Already up to date — all ${scheduleUnchangedCount} meeting${scheduleUnchangedCount === 1 ? "" : "s"} from this photo ${scheduleUnchangedCount === 1 ? "is" : "are"} already recorded.`
+            : scheduleSkippedPastCount > 0
+            ? `Everything in that photo has already passed — ${scheduleSkippedPastCount} meeting${scheduleSkippedPastCount === 1 ? "" : "s"} skipped.`
             : "Nothing found in that photo."}
         </div>
         <Button className="w-full" onClick={() => go({ screen: "meetings" })}>Back to Meetings</Button>
@@ -108,6 +110,7 @@ export function ScheduleReviewScreen() {
       <p className="mb-3 text-[13.5px] leading-relaxed text-muted-foreground">
         Nothing is saved yet.
         {scheduleUnchangedCount > 0 && ` ${scheduleUnchangedCount} meeting${scheduleUnchangedCount === 1 ? "" : "s"} from this photo ${scheduleUnchangedCount === 1 ? "was" : "were"} already up to date and skipped.`}
+        {scheduleSkippedPastCount > 0 && ` ${scheduleSkippedPastCount} meeting${scheduleSkippedPastCount === 1 ? "" : "s"} from earlier this week ${scheduleSkippedPastCount === 1 ? "has" : "have"} already passed and ${scheduleSkippedPastCount === 1 ? "was" : "were"} skipped.`}
       </p>
 
       {newItems.length > 0 && (

@@ -121,6 +121,7 @@ function Inner() {
   const [scheduleErr, setScheduleErr] = useState("");
   const [scheduleReview, setScheduleReview] = useState<ScheduleReviewItem[] | null>(null);
   const [scheduleUnchangedCount, setScheduleUnchangedCount] = useState(0);
+  const [scheduleSkippedPastCount, setScheduleSkippedPastCount] = useState(0);
   const [pendingQueue, setPendingQueue] = useState<PendingMeetingReview[]>([]);
   const [pendingIndex, setPendingIndex] = useState(0);
 
@@ -252,9 +253,10 @@ function Inner() {
         ...m,
         attendees: m.attendees.map(normalizeAttendeeName),
       }));
-      const { items, unchangedCount } = matchSchedule(extracted, store.upcomingMeetings);
+      const { items, unchangedCount, skippedPastCount } = matchSchedule(extracted, store.upcomingMeetings);
       setScheduleReview(items);
       setScheduleUnchangedCount(unchangedCount);
+      setScheduleSkippedPastCount(skippedPastCount);
       setView({ screen: "scheduleReview" });
     } catch (e) {
       setScheduleErr(e instanceof Error ? e.message : "Couldn't read the calendar photo.");
@@ -268,12 +270,13 @@ function Inner() {
     await store.commitSchedule(scheduleReview);
     setScheduleReview(null);
     setScheduleUnchangedCount(0);
+    setScheduleSkippedPastCount(0);
     setView({ screen: "meetings" });
   };
 
   const flow: Flow = {
     view, go: setView, draft, setDraft, meetingDate, setMeetingDate, busy, err, review, setReview, runExtraction, loadSample, commit,
-    scheduleBusy, scheduleErr, scheduleReview, scheduleUnchangedCount,
+    scheduleBusy, scheduleErr, scheduleReview, scheduleUnchangedCount, scheduleSkippedPastCount,
     setScheduleReview: (items) => setScheduleReview(items),
     runScheduleExtraction, commitSchedule,
     pendingQueue, pendingIndex, openPendingReviews, skipPendingReview,
