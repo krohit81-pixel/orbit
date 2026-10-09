@@ -34,7 +34,7 @@ function buildInfographicPrompt(m: Meeting, stats: PromptStats): string {
 // an installed/standalone PWA, where window.print() is unreliable on iOS.
 export function MeetingPrintScreen({ id }: { id: string }) {
   const { meetings, stakeholders } = useOrbit();
-  const { go } = useFlow();
+  const { back } = useFlow();
   const m = meetings.find((x) => x.id === id);
   const [includeTranscript, setIncludeTranscript] = useState(true);
   const [includePrompt, setIncludePrompt] = useState(false);
@@ -213,7 +213,7 @@ export function MeetingPrintScreen({ id }: { id: string }) {
   return (
     <div>
       <div className="flex items-center gap-3 py-2 pb-3">
-        <button onClick={() => go({ screen: "meeting", id })} aria-label="Back to meeting"><ArrowLeft className="h-5 w-5" /></button>
+        <button onClick={back} aria-label="Back to meeting"><ArrowLeft className="h-5 w-5" /></button>
         <div className="text-[22px] font-bold tracking-tight">Export meeting</div>
       </div>
 

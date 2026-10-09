@@ -1,20 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, FileDown, Sparkles } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { ChevronLeft, ChevronRight, Eye, FileDown, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DueLabel, Eyebrow, SectionTitle, Spinner, vibrantCard } from "@/components/bits";
+import { PageHead, Panel, PanelEmpty, Spinner } from "@/components/bits";
+import { ActionRow } from "@/components/ActionRow";
+import { WatchRow } from "@/components/WatchRow";
 import { useOrbit } from "@/components/OrbitStore";
-import { useFlow } from "@/components/flow";
 import {
-  cn, commitmentLabel, fmtFull, fmtWeekRange, startOfWeek, addDaysISO, todayISO, sanitizeForPdf, weeklyReportData,
+  commitmentLabel, fmtFull, fmtWeekRange, startOfWeek, addDaysISO, todayISO, sanitizeForPdf, weeklyReportData,
 } from "@/lib/utils";
 import type { WeeklyReport } from "@/lib/types";
 
 export function WeeklyReportScreen() {
   const { meetings, stakeholders } = useOrbit();
-  const { go } = useFlow();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(todayISO()));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -102,7 +101,7 @@ export function WeeklyReportScreen() {
       };
       const addSubheading = (text: string) => addBody(text, 11.5);
 
-      addTitle("Orbit — Weekly status report", 18, 26);
+      addTitle("Orbit — Weekly recap", 18, 26);
       addBody(weekLabel);
 
       addSection("What was achieved", report.achieved);
@@ -131,104 +130,47 @@ export function WeeklyReportScreen() {
     }
   };
 
+  const summaryPanel = (title: string, items: string[] | undefined) => (
+    <Panel title={<><Sparkles className="h-3.5 w-3.5 text-accent-foreground" /> {title}</>}>
+      {items === undefined ? <PanelEmpty>Tap “Write summary” to draft this section.</PanelEmpty>
+        : items.length === 0 ? <PanelEmpty>Nothing to report.</PanelEmpty>
+        : <ul className="flex list-disc flex-col gap-1.5 pb-3.5 pl-[34px] pr-4">{items.map((t, i) => <li key={i}>{t}</li>)}</ul>}
+    </Panel>
+  );
+
+  // Weekly recap (v2.0 layout of the v1.13 report): "Pending" and "Raised this week" render
+  // live from real data; only the two summary sections come from the model, on request.
   return (
-    <div>
-      <div className="flex items-center gap-3 py-2 pb-3">
-        <button onClick={() => go({ screen: "home" })} aria-label="Back to app"><ArrowLeft className="h-5 w-5" /></button>
-        <div className="text-[26px] font-bold tracking-tight">Weekly report</div>
-      </div>
-      <p className="mb-4 text-[13.5px] leading-relaxed text-muted-foreground">
-        A few-words status update for the week: what was achieved, what&apos;s pending or concerning, and what&apos;s next — generated from your logged meetings.
-      </p>
-
-      <div className="mb-4 flex items-center justify-between rounded-md border border-border bg-card px-3 py-2.5">
-        <button onClick={() => shiftWeek(-7)} aria-label="Previous week"><ChevronLeft className="h-5 w-5 text-muted-foreground/70" /></button>
-        <div className="text-[13.5px] font-semibold">{weekLabel}</div>
-        <button onClick={() => shiftWeek(7)} aria-label="Next week" disabled={isCurrentWeek} className="disabled:opacity-30">
-          <ChevronRight className="h-5 w-5 text-muted-foreground/70" />
-        </button>
-      </div>
-
-      <div className="mb-4 text-[13px] text-muted-foreground">
-        {data.meetings.length} meeting{data.meetings.length === 1 ? "" : "s"} logged this week.
-      </div>
-
-      <Button className="w-full" onClick={generate} disabled={busy}>
-        {busy ? <Spinner className="text-primary-foreground" /> : <Sparkles className="h-[18px] w-[18px]" />}
-        {busy ? "Generating…" : "Generate report"}
-      </Button>
-
-      {err && <div className="mt-2.5 text-[13px] text-warm">{err}</div>}
-
-      {report && (
-        <>
-          {report.achieved.length > 0 && (
-            <div className="mb-4 mt-4">
-              <SectionTitle>What was achieved</SectionTitle>
-              {report.achieved.map((t, i) => (
-                <Card key={i} className={cn(vibrantCard, "mb-2")}><CardContent className="text-[13.5px]">{t}</CardContent></Card>
-              ))}
-            </div>
-          )}
-
-          <div className="mb-4">
-            <SectionTitle>What was pending / open concerns</SectionTitle>
-            <Eyebrow>Pending commitments</Eyebrow>
-            {data.pending.length === 0 ? (
-              <div className="mb-2 mt-1.5 text-[13px] text-muted-foreground">Nothing open right now.</div>
-            ) : (
-              <div className="mt-1.5">
-                {data.pending.map((c) => (
-                  <Card
-                    key={c.id}
-                    onClick={() => go({ screen: "meeting", id: c.meeting.id })}
-                    className={cn(vibrantCard, "mb-2 cursor-pointer")}
-                  ><CardContent>
-                    <DueLabel dueDate={c.dueDate} due={c.due} done={c.status === "done"} className="mb-1 block" />
-                    <div className="text-[13.5px] font-medium leading-snug">{c.text}</div>
-                    <div className="mt-0.5 text-[11px] text-muted-foreground/70">{commitmentLabel(c, stakeholders)}</div>
-                  </CardContent></Card>
-                ))}
-              </div>
-            )}
-
-            <Eyebrow>Open concerns</Eyebrow>
-            {data.openConcerns.length === 0 ? (
-              <div className="mt-1.5 text-[13px] text-muted-foreground">Nothing flagged this week.</div>
-            ) : (
-              <div className="mt-1.5">
-                {data.openConcerns.map(({ concern, meeting, recurring }) => (
-                  <Card
-                    key={concern.id}
-                    onClick={() => go({ screen: "meeting", id: meeting.id })}
-                    className={cn(vibrantCard, "mb-2 cursor-pointer")}
-                  ><CardContent>
-                    <div className="text-[13.5px] font-medium leading-snug">{concern.text}</div>
-                    <div className="mt-0.5 flex items-center gap-2">
-                      {recurring && <span className="text-[11.5px] font-semibold text-warm">Raised again</span>}
-                      <span className="text-[11px] text-muted-foreground/70">{meeting.title} · {fmtFull(meeting.date)}</span>
-                    </div>
-                  </CardContent></Card>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {report.focusForFuture.length > 0 && (
-            <div className="mb-4">
-              <SectionTitle>Focus for future</SectionTitle>
-              {report.focusForFuture.map((t, i) => (
-                <Card key={i} className={cn(vibrantCard, "mb-2")}><CardContent className="text-[13.5px]">{t}</CardContent></Card>
-              ))}
-            </div>
-          )}
-
-          <Button variant="secondary" className="mt-2 w-full" onClick={exportPdf} disabled={exporting}>
-            {exporting ? <Spinner /> : <FileDown className="h-[18px] w-[18px]" />}
-            {exporting ? "Preparing PDF…" : "View / save PDF"}
+    <div className="max-w-[760px]">
+      <PageHead
+        eyebrow="Weekly recap"
+        title={weekLabel}
+        right={<>
+          <Button variant="secondary" size="sm" onClick={generate} disabled={busy}>
+            {busy ? <><Spinner className="h-3.5 w-3.5" /> Writing…</> : <><Sparkles className="h-3.5 w-3.5" /> {report ? "Rewrite" : "Write"} summary</>}
           </Button>
-        </>
-      )}
+          <Button variant="secondary" size="sm" onClick={exportPdf} disabled={!report || exporting} title={report ? undefined : "Write the summary first"}>
+            {exporting ? <Spinner className="h-3.5 w-3.5" /> : <FileDown className="h-3.5 w-3.5" />} PDF
+          </Button>
+        </>}
+      />
+      <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-2">
+        <button onClick={() => shiftWeek(-7)} aria-label="Previous week" className="rounded-md p-1 text-muted-foreground hover:bg-secondary"><ChevronLeft className="h-5 w-5" /></button>
+        <span className="text-[13px] text-muted-foreground">{data.meetings.length} meeting{data.meetings.length === 1 ? "" : "s"} logged this week</span>
+        <button onClick={() => shiftWeek(7)} aria-label="Next week" disabled={isCurrentWeek} className="rounded-md p-1 text-muted-foreground hover:bg-secondary disabled:opacity-30"><ChevronRight className="h-5 w-5" /></button>
+      </div>
+      {err && <div className="mb-3 text-[13px] text-warm">{err}</div>}
+      <div className="flex flex-col gap-4">
+        {summaryPanel("Achieved", report?.achieved)}
+        <Panel title="Pending" count={data.pending.length}>
+          {data.pending.length ? data.pending.map((c) => <ActionRow key={c.id} c={c} meeting={c.meeting} />) : <PanelEmpty>Nothing overdue or due in the next 7 days.</PanelEmpty>}
+        </Panel>
+        <Panel title={<><Eye className="h-3.5 w-3.5" /> Raised this week</>} count={data.openConcerns.length}>
+          {data.openConcerns.length ? data.openConcerns.map(({ concern, meeting, recurring }) => <WatchRow key={concern.id} concern={concern} meeting={meeting} recurring={recurring} />)
+            : <PanelEmpty>No new concerns this week.</PanelEmpty>}
+        </Panel>
+        {summaryPanel("Focus next week", report?.focusForFuture)}
+      </div>
     </div>
   );
 }

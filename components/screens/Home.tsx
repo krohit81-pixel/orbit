@@ -1,355 +1,191 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, ChevronRight, ChevronDown, Sparkles, AlertTriangle, RefreshCw, CalendarDays, ClipboardCheck } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { ArrowDownLeft, ArrowUpRight, BarChart3, ClipboardCheck, Eye, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CommitmentStrip, Eyebrow, DueLabel, Spinner, WeekGantt, vibrantCard } from "@/components/bits";
-import { cn } from "@/lib/utils";
+import { PageHead, Panel, PanelEmpty, Spinner } from "@/components/bits";
+import { ActionRow } from "@/components/ActionRow";
+import { WatchRow } from "@/components/WatchRow";
+import { UpcomingRow } from "@/components/UpcomingRow";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
 import {
-  fmtFull, fmtStamp, intel, isOverdue, openCommitmentsInvolvingMe, otherParty, commitmentLabel,
-  stakeholderById, todaysBriefData, todayISO, weekGanttData, type OpenCommitment,
+  actionDir, awaitingReply, briefDigest, cn, daysFromToday, dueSoon, fmtStamp, isOverdueAction, openCommitmentsInvolvingMe,
+  sortByUrgency, todayISO, todaysBriefData,
 } from "@/lib/utils";
 import type { TodaysBrief } from "@/lib/types";
 
 const BRIEF_CACHE_KEY = "orbit-todays-brief";
 
+// Today (v2.0): what you owe, what you're owed, the next meetings with prep, and what's on
+// watch — one place for each, nothing repeated. Everything here is deterministic and live;
+// the only model call is "Brief me", which runs only when tapped (v1.9's manual-trigger rule)
+// and whose last result is kept and shown with its timestamp until you dismiss or refresh it.
 export function HomeScreen() {
-  const { stakeholders, meetings, pendingMeetingReviews } = useOrbit();
-  const { go, openPendingReviews } = useFlow();
+  const { stakeholders, meetings, upcomingMeetings, pendingMeetingReviews } = useOrbit();
+  const { nav, openPendingReviews } = useFlow();
+
   const open = openCommitmentsInvolvingMe(meetings);
-  const gantt = weekGanttData(meetings);
-
-  // group by the other party — every item here already involves the user (openCommitmentsInvolvingMe),
-  // so when otherParty() can't name a counterparty (e.g. "You owe" with no one specified), the
-  // commitment is still clearly yours — bucket it under "You", not a vague "Unassigned".
-  const SELF_KEY = "__self";
-  const groups = new Map<string, OpenCommitment[]>();
-  open.forEach((cm) => {
-    const key = otherParty(cm) ?? SELF_KEY;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(cm);
-  });
-  const groupList = [...groups.entries()].sort((a, b) => {
-    if (a[0] === SELF_KEY) return 1;
-    if (b[0] === SELF_KEY) return -1;
-    return (stakeholderById(stakeholders, a[0])?.name ?? "").localeCompare(stakeholderById(stakeholders, b[0])?.name ?? "");
-  });
-  groupList.forEach(([, items]) => items.sort((x, y) => (x.dueDate || "9999").localeCompare(y.dueDate || "9999")));
-
-  // All groups start collapsed; the owner opens the ones they want to look at.
-  const [openKeys, setOpenKeys] = useState<Record<string, boolean>>({});
-  const isOpen = (key: string) => !!openKeys[key];
-  const toggle = (key: string) => setOpenKeys((o) => ({ ...o, [key]: !o[key] }));
-
-  const recent = stakeholders
-    .filter((s) => meetings.slice(0, 2).some((m) => m.mentioned.includes(s.id)))
+  const overdue = open.filter(isOverdueAction);
+  const week = open.filter(dueSoon);
+  const awaiting = open.filter(awaitingReply);
+  const youOwe = sortByUrgency(open.filter((c) => actionDir(c) === "out" && (isOverdueAction(c) || dueSoon(c))));
+  const owed = sortByUrgency(open.filter((c) => actionDir(c) === "in" && (isOverdueAction(c) || dueSoon(c) || awaitingReply(c))));
+  const allOut = open.filter((c) => actionDir(c) === "out").length;
+  const allIn = open.filter((c) => actionDir(c) === "in").length;
+  const briefData = todaysBriefData(meetings);
+  // Every open concern, recurring first then newest — not the brief's 30-day window, which
+  // emptied Watch entirely after a few quiet weeks even with dozens of concerns still open.
+  const watch = todaysBriefData(meetings, 36500).concerns;
+  const next = upcomingMeetings
+    .filter((u) => u.date >= todayISO())
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.startTime || "99:99").localeCompare(b.startTime || "99:99"))
     .slice(0, 3);
+  const todayMeetings = upcomingMeetings.filter((u) => daysFromToday(u.date) === 0);
 
-  // ---- Today's Brief ----
-  // Fully manual (v1.9) — never auto-fires, on mount or otherwise. Shows whatever was last
-  // generated (cached in localStorage, no matter how old) until the owner explicitly taps
-  // regenerate; a "Generated <stamp>" caption makes staleness visible rather than silently
-  // assumed-fresh. Nothing here is persisted to Supabase — same derived-not-stored model as
-  // the weekly report.
+  // ---- Brief me ----
   const [brief, setBrief] = useState<TodaysBrief | null>(null);
-  const [briefGeneratedAt, setBriefGeneratedAt] = useState<string | null>(null);
+  const [briefAt, setBriefAt] = useState<string | null>(null);
   const [briefBusy, setBriefBusy] = useState(false);
   const [briefErr, setBriefErr] = useState("");
-  const briefData = todaysBriefData(meetings);
 
-  const generateBrief = async () => {
-    setBriefErr("");
-    setBriefBusy(true);
-    try {
-      const lines: string[] = [`Today: ${fmtFull(todayISO())}`];
-      if (briefData.commitments.length) {
-        lines.push("Open commitments involving Rohit (most urgent first):");
-        briefData.commitments.slice(0, 12).forEach((c) => {
-          const due = c.dueDate ? (isOverdue(c.dueDate) ? `overdue, was due ${fmtFull(c.dueDate)}` : `due ${fmtFull(c.dueDate)}`) : c.due || "no due date";
-          lines.push(`- ${c.text} (${commitmentLabel(c, stakeholders)}, ${due})`);
-        });
-      } else {
-        lines.push("No open commitments involving Rohit.");
-      }
-      if (briefData.concerns.length) {
-        lines.push("Concerns raised recently:");
-        briefData.concerns.slice(0, 10).forEach(({ concern, meeting }) => {
-          lines.push(`- ${concern.text} (from "${meeting.title}", ${fmtFull(meeting.date)})`);
-        });
-      }
-      if (briefData.expectations.length) {
-        lines.push("Open expectations from recent meetings:");
-        briefData.expectations.slice(0, 10).forEach(({ e, meeting }) => {
-          lines.push(`- ${e.text} (from "${meeting.title}", ${fmtFull(meeting.date)})`);
-        });
-      }
-      if (briefData.recentMeetings.length) {
-        lines.push("Recent meetings for context:");
-        briefData.recentMeetings.forEach((m) => lines.push(`- ${fmtFull(m.date)}: ${m.title} — ${m.summary}`));
-      }
-      const res = await fetch("/api/llm", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ task: "todaysBrief", digest: lines.join("\n") }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.brief) throw new Error(json.error || "Couldn't generate today's brief.");
-      const b = json.brief as TodaysBrief;
-      const stamp = new Date().toISOString();
-      setBrief(b);
-      setBriefGeneratedAt(stamp);
-      try {
-        localStorage.setItem(BRIEF_CACHE_KEY, JSON.stringify({ generatedAt: stamp, brief: b }));
-      } catch {
-        // localStorage unavailable — brief still shows for this session, just won't be cached.
-      }
-    } catch (e) {
-      setBriefErr(e instanceof Error ? e.message : "Couldn't generate today's brief.");
-    } finally {
-      setBriefBusy(false);
-    }
-  };
-
-  // Load whatever was last generated, however old — no auto-fire, ever (v1.9).
   useEffect(() => {
     try {
       const raw = localStorage.getItem(BRIEF_CACHE_KEY);
       if (raw) {
         const cached = JSON.parse(raw) as { generatedAt?: string; brief: TodaysBrief };
-        if (cached.brief) {
-          setBrief(cached.brief);
-          setBriefGeneratedAt(cached.generatedAt ?? null);
-        }
+        if (cached.brief) { setBrief(cached.brief); setBriefAt(cached.generatedAt ?? null); }
       }
     } catch {
-      // ignore a corrupt/unavailable cache — falls through to the empty "generate" state
+      // ignore a corrupt/unavailable cache
     }
   }, []);
 
+  const generateBrief = async () => {
+    if (briefBusy) return;
+    setBriefErr("");
+    setBriefBusy(true);
+    try {
+      const digest = briefDigest(briefData, stakeholders, todayMeetings);
+      const res = await fetch("/api/llm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ task: "todaysBrief", digest }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.brief) throw new Error(json.error || "Couldn't write the brief.");
+      const stamp = new Date().toISOString();
+      setBrief(json.brief as TodaysBrief);
+      setBriefAt(stamp);
+      try { localStorage.setItem(BRIEF_CACHE_KEY, JSON.stringify({ generatedAt: stamp, brief: json.brief })); } catch { /* not cached */ }
+    } catch (e) {
+      setBriefErr(e instanceof Error ? e.message : "Couldn't write the brief.");
+    } finally {
+      setBriefBusy(false);
+    }
+  };
+  const dismissBrief = () => {
+    setBrief(null);
+    setBriefErr("");
+    try { localStorage.removeItem(BRIEF_CACHE_KEY); } catch { /* ignore */ }
+  };
+
+  const headline = `${overdue.length ? `${overdue.length} overdue` : "Nothing overdue"}${todayMeetings.length ? `, ${todayMeetings.length} meeting${todayMeetings.length > 1 ? "s" : ""} today` : ""}`;
+  const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  const stat = "flex flex-col gap-0.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left hover:border-muted-foreground/50";
+
   return (
     <div>
-      <h1 className="mb-4 mt-1 text-[26px] font-bold leading-tight tracking-tight">What needs your attention</h1>
+      <PageHead
+        eyebrow={today}
+        title={headline}
+        right={<>
+          <Button variant="secondary" size="sm" className="min-[700px]:hidden" onClick={() => nav({ screen: "weeklyReport" })}>
+            <BarChart3 className="h-3.5 w-3.5" /> Recap
+          </Button>
+          <Button variant="secondary" size="sm" onClick={generateBrief} disabled={briefBusy}>
+            {briefBusy ? <><Spinner className="h-3.5 w-3.5" /> Thinking…</> : <><Sparkles className="h-3.5 w-3.5" /> Brief me</>}
+          </Button>
+        </>}
+      />
 
-      {/* Overnight meeting close-out (v1.16) — surfaced here, the "what needs your attention"
-          landing screen, since these sat waiting since last night's cron run and nothing else
-          in the app currently points at them. Never auto-added to Meetings; this is only an
-          entry point into reviewing them. */}
-      {pendingMeetingReviews.length > 0 && (
-        <div className={cn(vibrantCard, "mb-[18px] rounded-md bg-accent/40 px-3.5 py-3.5")}>
-          <div className="flex items-center gap-1.5 text-[13px] font-bold tracking-tight text-foreground">
-            <ClipboardCheck className="h-4 w-4 text-primary" /> Ready for review
-          </div>
-          <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
-            {pendingMeetingReviews.length} meeting{pendingMeetingReviews.length === 1 ? "" : "s"} from your calendar {pendingMeetingReviews.length === 1 ? "has" : "have"} passed and {pendingMeetingReviews.length === 1 ? "is" : "are"} ready to add to Meetings, with whatever your prep notes captured.
-          </p>
-          <Button className="mt-2.5 w-full" onClick={openPendingReviews}>Review now</Button>
-        </div>
-      )}
-
-      {/* This week (v1.14) — sits above Today's Brief, deliberately independent of it: no LLM
-          call, no "generate" gate, renders live straight from weekGanttData() every time Home
-          mounts. */}
-      <div className={cn(vibrantCard, "mb-[18px] rounded-md px-3.5 py-3.5")}>
-        <div className="mb-2.5 flex items-center gap-1.5 text-[13px] font-bold tracking-tight text-foreground">
-          <CalendarDays className="h-4 w-4 text-primary" /> This week
-        </div>
-        {gantt.rows.length === 0 ? (
-          <div className="text-[13px] text-muted-foreground">Nothing due or overdue in the next 7 days.</div>
-        ) : (
-          <WeekGantt data={gantt} stakeholders={stakeholders} onSelect={(meetingId) => go({ screen: "meeting", id: meetingId })} />
-        )}
-      </div>
-
-      {meetings.length > 0 && (
-        <div className={cn(vibrantCard, "mb-[18px] rounded-md bg-accent/40")}>
-          <div className="flex items-center justify-between px-3.5 pt-3">
-            <div>
-              <span className="text-[13px] font-bold tracking-tight text-foreground">Today&apos;s Brief</span>
-              {brief && (
-                <div className="text-[10.5px] text-muted-foreground/60">
-                  {briefGeneratedAt ? `Generated ${fmtStamp(briefGeneratedAt)}` : "Generated earlier — tap ↻ to refresh"}
-                </div>
-              )}
-            </div>
-            {brief && (
-              <button
-                onClick={generateBrief}
-                disabled={briefBusy}
-                aria-label="Regenerate today's brief"
-                className="rounded-md p-1 text-muted-foreground/70 hover:bg-secondary hover:text-foreground disabled:opacity-50"
-              >
-                {briefBusy ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              </button>
-            )}
-          </div>
-
-          {briefErr && <div className="px-3.5 pb-3 pt-2 text-[13px] text-warm">{briefErr}</div>}
-
-          {!brief && !briefErr && (
-            <div className="px-3.5 pb-3.5 pt-2.5">
-              <p className="mb-2.5 text-[13px] leading-relaxed text-muted-foreground">
-                Suggested priorities, open commitments, and potential risks — generated on demand from your logged meetings.
-              </p>
-              <button
-                onClick={generateBrief}
-                disabled={briefBusy}
-                className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-3.5 py-2.5 text-[13.5px] font-semibold text-primary-foreground disabled:opacity-60"
-              >
-                {briefBusy ? <Spinner className="text-primary-foreground" /> : <Sparkles className="h-[16px] w-[16px]" />}
-                {briefBusy ? "Generating…" : "Generate brief"}
-              </button>
-            </div>
-          )}
-
-          {brief && (
-            <div className="px-3.5 pb-3.5 pt-2">
-              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
-                Open commitments
-              </div>
-              {briefData.commitments.length === 0 ? (
-                <div className="mb-3 text-[13px] text-muted-foreground">Nothing outstanding.</div>
-              ) : (
-                <CommitmentStrip
-                  items={briefData.commitments.slice(0, 10)}
-                  stakeholders={stakeholders}
-                  onSelect={(meetingId) => go({ screen: "meeting", id: meetingId })}
-                />
-              )}
-
-              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
-                <Sparkles className="h-3 w-3" /> Suggested priorities
-              </div>
-              {brief.priorities.length === 0 ? (
-                <div className="mb-3 text-[13px] text-muted-foreground">Nothing urgent stands out.</div>
-              ) : (
-                <div className="mb-3 space-y-1.5">
-                  {brief.priorities.map((p, i) => (
-                    <div key={i} className="rounded-md border border-primary/20 bg-card px-2.5 py-2">
-                      <div className="text-[13.5px] font-medium leading-snug">{p}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
-                <AlertTriangle className="h-3 w-3" /> Potential risks &amp; concerns
-              </div>
-              {briefData.concerns.length === 0 ? (
-                <div className="text-[13px] text-muted-foreground">Nothing flagged right now.</div>
-              ) : (
-                <div className="space-y-1.5">
-                  {briefData.concerns.slice(0, 5).map(({ concern, meeting, recurring }) => (
-                    <div
-                      key={concern.id}
-                      onClick={() => go({ screen: "meeting", id: meeting.id })}
-                      className="cursor-pointer rounded-md border border-primary/20 bg-card px-2.5 py-2"
-                    >
-                      <div className="text-[13.5px] font-medium leading-snug">{concern.text}</div>
-                      <div className="mt-0.5 flex items-center gap-2">
-                        {recurring && <span className="text-[11.5px] font-semibold text-warm">Raised again</span>}
-                        <span className="text-[11px] text-muted-foreground/70">{meeting.title} · {fmtFull(meeting.date)}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      <button
-        onClick={() => go({ screen: "search" })}
-        className="mb-[18px] flex w-full items-center gap-2 rounded-md bg-secondary px-3.5 py-3 text-sm text-muted-foreground"
-      >
-        <Search className="h-[17px] w-[17px]" /> Search topics, people, commitments…
-      </button>
-
-      <div className="mb-2.5 mt-1 flex items-baseline justify-between">
-        <button onClick={() => toggle("section:recentMeetings")} className="flex items-center gap-1">
-          <Eyebrow>Recent meetings</Eyebrow>
-          {isOpen("section:recentMeetings") ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/60" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />}
+      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <button className={stat} onClick={() => nav({ screen: "actions", when: "overdue" })}>
+          <b className={cn("text-[24px] font-bold leading-tight tabular-nums", overdue.length > 0 && "text-warm")}>{overdue.length}</b>
+          <span className="text-[12.5px] text-muted-foreground">Overdue</span>
         </button>
-        <button onClick={() => go({ screen: "meetings" })} className="text-xs font-semibold text-primary">All</button>
+        <button className={stat} onClick={() => nav({ screen: "actions", when: "week" })}>
+          <b className="text-[24px] font-bold leading-tight tabular-nums">{week.length}</b>
+          <span className="text-[12.5px] text-muted-foreground">Due in 7 days</span>
+        </button>
+        <button className={stat} onClick={() => nav({ screen: "actions", when: "awaiting" })}>
+          <b className="text-[24px] font-bold leading-tight tabular-nums">{awaiting.length}</b>
+          <span className="text-[12.5px] text-muted-foreground">Awaiting reply</span>
+        </button>
+        <button className={stat} onClick={() => document.getElementById("watch-panel")?.scrollIntoView({ behavior: "smooth", block: "center" })}>
+          <b className="text-[24px] font-bold leading-tight tabular-nums">{watch.length}</b>
+          <span className="text-[12.5px] text-muted-foreground">On watch</span>
+        </button>
       </div>
-      {isOpen("section:recentMeetings") && meetings.slice(0, 3).map((m) => (
-        <Card key={m.id} onClick={() => go({ screen: "meeting", id: m.id })} className={cn(vibrantCard, "mb-2.5 cursor-pointer")}>
-          <CardContent>
-            <div className="font-semibold">{m.title}</div>
-            <div className="mt-0.5 text-[12px] text-muted-foreground/70">{fmtFull(m.date)}</div>
-            <div className="mt-1.5 text-[13px] leading-snug text-muted-foreground">{m.summary}</div>
-          </CardContent>
-        </Card>
-      ))}
 
-      <button onClick={() => toggle("section:commitments")} className="mb-2.5 mt-1 flex items-center gap-1">
-        <Eyebrow>Commitments by stakeholder</Eyebrow>
-        {isOpen("section:commitments") ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/60" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />}
-      </button>
-      {isOpen("section:commitments") && (
-        <>
-          {open.length === 0 && (
-            <Card className="mb-2.5"><CardContent className="text-muted-foreground/70">Nothing outstanding. Clean slate.</CardContent></Card>
-          )}
-          {groupList.map(([key, items]) => {
-            const person = key === SELF_KEY ? null : stakeholderById(stakeholders, key);
-            const openState = isOpen(key);
-            return (
-              <div key={key} className={cn(vibrantCard, "mb-2.5 overflow-hidden rounded-md")}>
-                <button
-                  className="flex w-full items-center justify-between px-3.5 py-2.5"
-                  onClick={() => toggle(key)}
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="text-[13px] font-bold tracking-tight text-foreground">{person ? person.name : "You"}</span>
-                    <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">{items.length}</span>
-                  </span>
-                  {openState ? <ChevronDown className="h-4 w-4 text-muted-foreground/60" /> : <ChevronRight className="h-4 w-4 text-muted-foreground/60" />}
-                </button>
-                {openState && (
-                  <div className="border-t border-primary/20">
-                    {items.map((cm) => (
-                      <div
-                        key={cm.id}
-                        className="cursor-pointer border-b border-primary/20 px-3.5 py-2.5 last:border-b-0"
-                        onClick={() => go({ screen: "meeting", id: cm.meeting.id })}
-                      >
-                        <div className="text-[14px] font-medium">{cm.text}</div>
-                        <div className="mt-0.5 flex items-center gap-2">
-                          <span className="text-[11.5px] font-semibold text-primary">{commitmentLabel(cm, stakeholders)}</span>
-                          <DueLabel dueDate={cm.dueDate} due={cm.due} done={cm.status === "done"} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </>
+      {pendingMeetingReviews.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-accent px-4 py-3">
+          <ClipboardCheck className="h-[18px] w-[18px] shrink-0 text-accent-foreground" />
+          <div className="min-w-0 flex-1 text-[13.5px]">
+            <b className="font-semibold">{pendingMeetingReviews.length} meeting{pendingMeetingReviews.length === 1 ? "" : "s"} from your calendar</b>{" "}
+            {pendingMeetingReviews.length === 1 ? "is" : "are"} ready to add. Orbit drafted {pendingMeetingReviews.length === 1 ? "it" : "them"} from your prep notes; review before anything is saved.
+          </div>
+          <Button size="sm" onClick={openPendingReviews}>Review</Button>
+        </div>
       )}
 
-      {recent.length > 0 && (
-        <>
-          <button onClick={() => toggle("section:recentlyUpdated")} className="mb-2.5 mt-1 flex items-center gap-1">
-            <Eyebrow>Recently updated</Eyebrow>
-            {isOpen("section:recentlyUpdated") ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/60" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />}
-          </button>
-          {isOpen("section:recentlyUpdated") && recent.map((s) => (
-            <Card key={s.id} onClick={() => go({ screen: "stakeholder", id: s.id })} className="mb-2.5 cursor-pointer">
-              <CardContent className="flex items-center justify-between">
-                <div>
-                  <div className="font-semibold">{s.name}</div>
-                  <div className="text-[12.5px] text-muted-foreground">{intel(meetings, s.id).exps.length} open expectation(s)</div>
-                </div>
-                <ChevronRight className="h-[18px] w-[18px] text-muted-foreground/60" />
-              </CardContent>
-            </Card>
-          ))}
-        </>
+      {(brief || briefErr) && (
+        <Panel
+          className="mb-4"
+          title={<span className="flex items-center gap-1.5 text-accent-foreground"><Sparkles className="h-3.5 w-3.5" /> Brief</span>}
+          right={
+            <span className="flex items-center gap-2">
+              {briefAt && <span className="text-[12px] text-muted-foreground/70">Generated {fmtStamp(briefAt)}</span>}
+              <button onClick={dismissBrief} aria-label="Dismiss brief" className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-secondary"><X className="h-3.5 w-3.5" /></button>
+            </span>
+          }
+        >
+          {briefErr ? <PanelEmpty><span className="text-warm">{briefErr}</span></PanelEmpty>
+            : brief && brief.priorities.length === 0 ? <PanelEmpty>Nothing urgent stands out.</PanelEmpty>
+            : <ol className="flex list-decimal flex-col gap-1.5 pb-3.5 pl-9 pr-4">{brief?.priorities.map((p, i) => <li key={i} className="leading-snug">{p}</li>)}</ol>}
+        </Panel>
+      )}
+
+      <div className="flex flex-col gap-4">
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          <Panel
+            title={<><ArrowUpRight className="h-3.5 w-3.5" /> You owe</>}
+            count={youOwe.length}
+            footer={{ label: `All ${allOut} you owe`, onClick: () => nav({ screen: "actions", dir: "out" }) }}
+          >
+            {youOwe.length ? youOwe.slice(0, 6).map((c) => <ActionRow key={c.id} c={c} meeting={c.meeting} directional />) : <PanelEmpty>Nothing due this week.</PanelEmpty>}
+          </Panel>
+          <Panel
+            title={<><ArrowDownLeft className="h-3.5 w-3.5" /> Owed to you</>}
+            count={owed.length}
+            footer={{ label: `All ${allIn} owed to you`, onClick: () => nav({ screen: "actions", dir: "in" }) }}
+          >
+            {owed.length ? owed.slice(0, 6).map((c) => <ActionRow key={c.id} c={c} meeting={c.meeting} directional nudge />) : <PanelEmpty>Nobody owes you anything this week.</PanelEmpty>}
+          </Panel>
+        </div>
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          <Panel title="Next meetings" footer={{ label: "Full schedule", onClick: () => nav({ screen: "meetings", tab: "upcoming" }) }}>
+            {next.length ? next.map((u) => <UpcomingRow key={u.id} u={u} />) : <PanelEmpty>Nothing scheduled. Import a calendar photo from Capture.</PanelEmpty>}
+          </Panel>
+          <Panel id="watch-panel" title={<><Eye className="h-3.5 w-3.5" /> Watch</>} count={watch.length}>
+            {watch.length ? watch.slice(0, 4).map(({ concern, meeting, recurring }) => <WatchRow key={concern.id} concern={concern} meeting={meeting} recurring={recurring} />)
+              : <PanelEmpty>Nothing on watch.</PanelEmpty>}
+            {watch.length > 4 && <PanelEmpty>{watch.length - 4} more open. They stay on the meetings and people they came from; resolve the ones that no longer apply.</PanelEmpty>}
+          </Panel>
+        </div>
+      </div>
+      {meetings.length === 0 && (
+        <p className="mt-6 text-center text-[13px] text-muted-foreground">No meetings yet. Use Capture to add your first one.</p>
       )}
     </div>
   );

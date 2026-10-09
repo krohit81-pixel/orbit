@@ -46,10 +46,6 @@ export const fmtStamp = (iso?: string | null): string =>
   iso ? new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "";
 export const fmtToday = (): string =>
   new Date().toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
-// 3-letter weekday only ("Mon") — for the week-gantt day header (v1.14), the one place so
-// far that wants just the day name without a date attached.
-export const fmtWeekdayShort = (s: string): string =>
-  new Date(s + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short" });
 // "14:00" -> "2:00 PM" — for upcoming-meeting times (v1.15), stored as plain 24h "HH:MM"
 // strings (no timezone of their own, same as every other date/time field in this app).
 export function fmtTime12h(hhmm?: string | null): string | null {
@@ -106,29 +102,11 @@ export function bucketDue(s?: string | null): DueBucket {
 // (open commitments involving me) and weeklyReportData's "pending" list (v1.13) so both
 // surfaces sort urgency identically instead of each inventing its own order.
 const DUE_RANK: Record<DueBucket, number> = { overdue: 0, week: 1, upcoming: 2, undated: 3 };
-function sortByUrgency<T extends { dueDate?: string | null }>(items: T[]): T[] {
+export function sortByUrgency<T extends { dueDate?: string | null }>(items: T[]): T[] {
   return items.slice().sort((a, b) => {
     const r = DUE_RANK[bucketDue(a.dueDate)] - DUE_RANK[bucketDue(b.dueDate)];
     return r !== 0 ? r : (a.dueDate || "9999").localeCompare(b.dueDate || "9999");
   });
-}
-
-// Urgency bucket + short status word for the dashboard's open-commitments strip (v1.11).
-// Deliberately separate from bucketDue()/DueBucket above (which drive DueLabel and the
-// commitments-by-stakeholder sort and use a 7-day "week" window) — the strip wants a
-// tighter 3-day amber cutoff, and keeping it a distinct function means that doesn't ripple
-// into sorting or DueLabel elsewhere.
-export type TileBucket = "overdue" | "soon" | "later" | "undated";
-export function dueTileInfo(s?: string | null): { bucket: TileBucket; label: string } {
-  if (!s) return { bucket: "undated", label: "No date" };
-  const t = new Date();
-  t.setHours(0, 0, 0, 0);
-  const days = Math.round((new Date(s + "T00:00:00").getTime() - t.getTime()) / 86400000);
-  if (days < 0) return { bucket: "overdue", label: "Overdue" };
-  if (days === 0) return { bucket: "soon", label: "Due today" };
-  if (days === 1) return { bucket: "soon", label: "Due tmrw" };
-  if (days <= 3) return { bucket: "soon", label: `${days} days` };
-  return { bucket: "later", label: fmtDate(s) ?? "" };
 }
 
 // ---- text / search ----
@@ -190,31 +168,6 @@ export function commitmentLabel(c: Commitment, stakeholders: Stakeholder[]): str
   if (c.owedToId === SELF) return `${owner} owes you`;
   return c.owedToId ? `${owner} owes ${owed}` : `${owner} committed`;
 }
-// Compact counterparty for the dashboard strip's tiles (v1.11) — just a direction + name,
-// no "You owe"/"owes you" phrasing (CommitmentStrip renders the direction as a small arrow
-// icon instead, so the name gets more of the tile's limited width). Every commitment reaching
-// this has already passed openCommitmentsInvolvingMe, so ownerId or owedToId is always SELF —
-// "self" covers the one remaining edge case, "You owe" with no counterparty specified.
-export function tileCounterparty(c: Commitment, stakeholders: Stakeholder[]): { name: string; direction: "out" | "in" | "self" } {
-  if (c.ownerId === SELF) {
-    if (!c.owedToId || c.owedToId === SELF) return { name: "You", direction: "self" };
-    return { name: partyName(stakeholders, c.owedToId), direction: "out" };
-  }
-  return { name: partyName(stakeholders, c.ownerId), direction: "in" };
-}
-// A short, deterministic "what this is about" label for the week-gantt bar (v1.14.2) — the
-// first few real words of the commitment's own text, never a model's restatement (same
-// provenance principle as master context §5, applied to a label instead of a citation). A
-// small set of common leading filler phrases ("Rohit will", "I'll", ...) is stripped first so
-// the remaining words carry more of the actual topic; the caller is still responsible for
-// truncating with an ellipsis at render time, since even a handful of words can overflow a
-// narrow bar depending on the font and the bar's actual pixel width.
-const LABEL_FILLER = /^(rohit will |rohit to |rohit is going to |i will |i'll |you will )/i;
-export function shortLabel(text: string, maxWords = 4): string {
-  const stripped = text.replace(LABEL_FILLER, "").trim();
-  return stripped.split(/\s+/).slice(0, maxWords).join(" ");
-}
-
 // Outlook shows attendee names as "Last, First" in its calendar grid; the extractSchedule
 // prompt (v1.15) asks the model to flip that to "First Last", but verifying against a real
 // photo showed it doesn't reliably follow that instruction — names came back unflipped. Doing
@@ -288,66 +241,113 @@ export function openCommitmentsDigest(meetings: Meeting[], stakeholders: Stakeho
     .join("\n");
 }
 
-// ---- week gantt (v1.14) ----
-// Deterministic "shape of the week" timeline for Home's dashboard — a rolling 7-day window
-// starting today, one row per open commitment due (or overdue) within it, each row's bar
-// spanning from the meeting it was raised in to its due date. Both endpoints are real,
-// already-tracked dates (Commitment has no separate "start date" field, so the meeting that
-// produced it stands in for one) — nothing invented, same provenance spirit as every other
-// derived view in the app. No LLM involved; read-only, click-through to the source meeting,
-// same interaction as CommitmentStrip's tiles right above it on Home.
-export interface WeekGanttRow {
-  key: string; // stable within a render — otherParty + the bar's own span, for React keys and expand-state
-  commitments: OpenCommitment[]; // 1 or more — see the grouping comment below
-  startCol: number; // 0-6, index into `days` — the meeting date, clamped into the window
-  endCol: number; // 0-6, index into `days` — the due date, clamped into the window; overdue
-                  // commitments clamp to column 0 ("today") rather than a past date off-grid
-  bucket: TileBucket; // color, from dueTileInfo() — the exact tokens CommitmentStrip uses
+// ---- actions (v2.0) ----
+// Orbit 2.0 presents every commitment involving the owner as one "action" with a direction:
+// "out" = the owner owes it, "in" = someone owes the owner. Storage is unchanged (still
+// Commitment inside meetings.commitments) — this is purely a read-side vocabulary. "other" is
+// a commitment between two other people (e.g. "David owes Priya"); those only appear on the
+// meeting they came from, never in the owner's own action lists.
+export type ActionDir = "out" | "in" | "other";
+export function actionDir(c: Commitment): ActionDir {
+  if (c.ownerId === SELF) return "out";
+  if (c.owedToId === SELF) return "in";
+  return "other";
 }
-export interface WeekGanttData {
-  days: string[]; // 7 ISO dates, today first
-  rows: WeekGanttRow[]; // most urgent first
+// Most recent "Follow up" entry in the commitment's own update log, or null. Follow-ups ride
+// the existing append-only log (CommitmentUpdate.kind = "follow_up") rather than a new field.
+export function lastFollowUp(c: Commitment): string | null {
+  const dates = (c.updates ?? []).filter((u) => u.kind === "follow_up").map((u) => u.date).sort();
+  return dates.length ? dates[dates.length - 1] : null;
 }
-export function weekGanttData(meetings: Meeting[]): WeekGanttData {
-  const start = todayISO();
-  const days = Array.from({ length: 7 }, (_, i) => addDaysISO(start, i));
-  const startMs = new Date(start + "T00:00:00").getTime();
-  const dayIndexFrom = (iso: string) => Math.round((new Date(iso + "T00:00:00").getTime() - startMs) / 86400000);
+export const awaitingReply = (c: Commitment): boolean => c.status !== "done" && actionDir(c) === "in" && !!lastFollowUp(c);
+export const dueSoon = (c: Commitment): boolean => c.status !== "done" && bucketDue(c.dueDate) === "week";
+export const isOverdueAction = (c: Commitment): boolean => c.status !== "done" && bucketDue(c.dueDate) === "overdue";
 
-  // Reuses bucketDue's existing 7-day "week" window as the inclusion filter, rather than
-  // inventing a new one (see Design Decision #39 on the weekly report's near-identical
-  // choice) — an open commitment belongs on this timeline if it's overdue or due within the
-  // next 7 days. Undated commitments have no due date to place on a timeline, so they're
-  // excluded here (still fully visible elsewhere on Home and every Stakeholder screen).
-  const candidates = openCommitmentsInvolvingMe(meetings).filter((c) => {
-    if (!c.dueDate) return false;
-    const b = bucketDue(c.dueDate);
-    return b === "overdue" || b === "week";
+// Whole calendar days from today (local midnight) to `iso` — negative when in the past. Same
+// local-time frame on both sides (see the timezone note above todayISO).
+export function daysFromToday(iso: string): number {
+  const t = new Date();
+  t.setHours(0, 0, 0, 0);
+  return Math.round((new Date(iso + "T00:00:00").getTime() - t.getTime()) / 86400000);
+}
+// "today", "yesterday", "5d ago", "3w ago", "2mo ago"
+export function agoLabel(iso: string): string {
+  const n = -daysFromToday(iso);
+  if (n <= 0) return "today";
+  if (n === 1) return "yesterday";
+  if (n < 14) return `${n}d ago`;
+  if (n < 60) return `${Math.round(n / 7)}w ago`;
+  return `${Math.round(n / 30)}mo ago`;
+}
+
+// The due-date pill on every action row (v2.0). Red only when overdue, amber for the next
+// three days, neutral otherwise — less colour noise than v1's four-colour tiles.
+export interface DueChipInfo { tone: "red" | "amber" | "plain"; label: string }
+export function dueChip(dueDate?: string | null, due?: string | null, done?: boolean): DueChipInfo {
+  if (done) return { tone: "plain", label: "Done" };
+  if (!dueDate) return { tone: "plain", label: due || "No date" };
+  const n = daysFromToday(dueDate);
+  if (n < 0) return { tone: "red", label: `${-n}d overdue` };
+  if (n === 0) return { tone: "amber", label: "Today" };
+  if (n === 1) return { tone: "amber", label: "Tomorrow" };
+  if (n <= 3) return { tone: "amber", label: `In ${n} days` };
+  if (n <= 7) return { tone: "plain", label: new Date(dueDate + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric" }) };
+  return { tone: "plain", label: fmtDate(dueDate) ?? dueDate };
+}
+
+// Counterparty name for an action seen from the owner's side ("Maya Chen"), or "No one named"
+// for a self-only commitment with no counterparty recorded.
+export function counterpartyName(c: Commitment, stakeholders: Stakeholder[]): string {
+  const id = otherParty(c);
+  return id ? partyName(stakeholders, id) : "No one named";
+}
+
+// Calendar attendees are stored as plain names (UpcomingMeeting.attendees, v1.15) — this maps
+// them to known stakeholders by exact normalized full-name match, for display and meeting prep
+// only. Deliberately exact: a fuzzy match here would attach the wrong person's open items to a
+// meeting, which is worse than showing none.
+export function attendeeStakeholderIds(attendees: string[], stakeholders: Stakeholder[]): string[] {
+  const byName = new Map(stakeholders.map((s) => [norm(s.name), s.id] as const));
+  const ids: string[] = [];
+  attendees.forEach((a) => {
+    const id = byName.get(norm(a));
+    if (id && !ids.includes(id)) ids.push(id);
   });
+  return ids;
+}
 
-  // Group commitments that would otherwise render as visually-identical bars: same
-  // counterparty, same start/end columns. A real, common shape this fixes — one meeting
-  // producing several same-due-date deliverables from one person (e.g. five things Nick owes
-  // by the same date) — used to render as N indistinguishable full-width bars with
-  // identically-truncated labels, since shortLabel() has no way to differentiate commitments
-  // that share a leading phrase. See master context §10.
-  const groups = new Map<string, { commitments: OpenCommitment[]; startCol: number; endCol: number; bucket: TileBucket }>();
-  const order: string[] = [];
-  sortByUrgency(candidates).forEach((commitment) => {
-    const endCol = commitment.dueDate! < start ? 0 : Math.min(6, Math.max(0, dayIndexFrom(commitment.dueDate!)));
-    const startCol = Math.min(Math.max(0, dayIndexFrom(commitment.meeting.date)), endCol);
-    const { bucket } = dueTileInfo(commitment.dueDate);
-    const key = `${otherParty(commitment) ?? "__self"}|${startCol}|${endCol}`;
-    if (!groups.has(key)) {
-      groups.set(key, { commitments: [], startCol, endCol, bucket });
-      order.push(key);
-    }
-    groups.get(key)!.commitments.push(commitment);
-  });
-
-  const rows: WeekGanttRow[] = order.map((key) => ({ key, ...groups.get(key)! }));
-
-  return { days, rows };
+// Digest for the "todaysBrief" LLM task — moved here from Home (v2.0) so the screen stays thin.
+export function briefDigest(data: TodaysBriefData, stakeholders: Stakeholder[], upcomingToday: { title: string; startTime: string | null }[]): string {
+  const lines: string[] = [`Today: ${fmtFull(todayISO())}`];
+  if (data.commitments.length) {
+    lines.push("Open commitments involving Rohit (most urgent first):");
+    data.commitments.slice(0, 12).forEach((c) => {
+      const due = c.dueDate ? (isOverdue(c.dueDate) ? `overdue, was due ${fmtFull(c.dueDate)}` : `due ${fmtFull(c.dueDate)}`) : c.due || "no due date";
+      const chased = lastFollowUp(c);
+      lines.push(`- ${c.text} (${commitmentLabel(c, stakeholders)}, ${due}${chased ? `, followed up ${fmtFull(chased)}` : ""})`);
+    });
+  } else {
+    lines.push("No open commitments involving Rohit.");
+  }
+  if (upcomingToday.length) {
+    lines.push("Meetings on the calendar today:");
+    upcomingToday.forEach((u) => lines.push(`- ${u.startTime ?? "time not set"}: ${u.title}`));
+  }
+  if (data.concerns.length) {
+    lines.push("Concerns raised recently:");
+    data.concerns.slice(0, 10).forEach(({ concern, meeting, recurring }) => {
+      lines.push(`- ${concern.text}${recurring ? " (raised again)" : ""} (from "${meeting.title}", ${fmtFull(meeting.date)})`);
+    });
+  }
+  if (data.expectations.length) {
+    lines.push("Open expectations from recent meetings:");
+    data.expectations.slice(0, 10).forEach(({ e, meeting }) => lines.push(`- ${e.text} (from "${meeting.title}", ${fmtFull(meeting.date)})`));
+  }
+  if (data.recentMeetings.length) {
+    lines.push("Recent meetings for context:");
+    data.recentMeetings.forEach((m) => lines.push(`- ${fmtFull(m.date)}: ${m.title} — ${m.summary}`));
+  }
+  return lines.join("\n");
 }
 
 // ---- pdf export ----
@@ -385,7 +385,7 @@ export interface WeeklyReportData {
   actionItems: string[];
   completed: Commitment[];
   upcoming: OpenCommitment[]; // my own commitments due the following week
-  pending: OpenCommitment[]; // v1.13: every currently open commitment involving me, most urgent first — the running backlog, not just this week's
+  pending: OpenCommitment[]; // v1.13: open commitments involving me that are overdue or due within 7 days, most urgent first
   openConcerns: BriefConcern[]; // v1.13: concerns raised within this specific week, recurring-first — same recurrence algorithm as todaysBriefData/recurringConcernIds
 }
 export function weeklyReportData(meetings: Meeting[], startISO: string): WeeklyReportData {
@@ -738,7 +738,7 @@ export function assistantDigest(meetings: Meeting[], stakeholders: Stakeholder[]
     if (m.topics.length) lines.push(`Topics: ${m.topics.join(", ")}`);
     m.expectations.forEach((e) => lines.push(`Expectation (${partyName(stakeholders, e.stakeholderId)}, ${e.status}): ${e.text}`));
     m.commitments.forEach((c) => lines.push(`Commitment (${commitmentLabel(c, stakeholders)}, ${c.status}${c.dueDate ? `, due ${fmtFull(c.dueDate)}` : ""}): ${c.text}`));
-    m.concerns.forEach((c) => lines.push(`Concern (${partyName(stakeholders, c.stakeholderId)}): ${c.text}`));
+    m.concerns.forEach((c) => lines.push(`Concern (${partyName(stakeholders, c.stakeholderId)}${c.status === "resolved" ? `, resolved: ${c.resolution === "mitigated" ? "mitigated" : "no longer relevant"}` : ", open"}): ${c.text}`));
     if (m.decisions.length) lines.push(`Decisions: ${m.decisions.join("; ")}`);
     if (m.actionItems.length) lines.push(`Action items: ${m.actionItems.join("; ")}`);
     lines.push("");

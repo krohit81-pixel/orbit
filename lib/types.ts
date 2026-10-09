@@ -36,6 +36,10 @@ export interface CommitmentUpdate {
   dueDateBefore?: string | null; // set only when this update also revised the due date
   dueDateAfter?: string | null;
   createdAt: string; // ISO timestamp, for stable ordering when same-day updates are logged
+  // v2.0: marks an entry logged by the "Follow up" action on something owed TO the owner, so
+  // "awaiting reply" can be derived from the same append-only log rather than a new field.
+  // Absent on every older entry (= an ordinary progress note).
+  kind?: "follow_up";
 }
 
 // A commitment flows from an owner to a recipient ("me" is the sentinel for the user).

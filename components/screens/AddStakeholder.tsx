@@ -13,7 +13,7 @@ import type { Relationship } from "@/lib/types";
 
 export function AddStakeholderScreen() {
   const { stakeholders, addStakeholder } = useOrbit();
-  const { go } = useFlow();
+  const { back } = useFlow();
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [relationship, setRelationship] = useState<Relationship>("Peer");
@@ -25,7 +25,7 @@ export function AddStakeholderScreen() {
     setSaving(true);
     try {
       await addStakeholder({ name, title, relationship, reportsTo: reportsTo || null });
-      go({ screen: "people" });
+      back();
     } finally {
       setSaving(false);
     }
@@ -34,7 +34,7 @@ export function AddStakeholderScreen() {
   return (
     <div>
       <div className="flex items-center gap-3 py-2 pb-3.5">
-        <button onClick={() => go({ screen: "people" })}><ArrowLeft className="h-5 w-5" /></button>
+        <button onClick={back} aria-label="Back"><ArrowLeft className="h-5 w-5" /></button>
         <div className="text-[26px] font-bold tracking-tight">Add stakeholder</div>
       </div>
       <p className="mb-4 text-[13.5px] leading-relaxed text-muted-foreground">

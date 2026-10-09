@@ -1,23 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Home, Users, FileText, Search, Menu, CalendarRange, X } from "lucide-react";
-import { cn, fmtToday } from "@/lib/utils";
+import { BarChart3, CalendarDays, Home, ListChecks, Moon, Plus, Search, Sun, Users } from "lucide-react";
+import { cn, isOverdueAction, openCommitmentsInvolvingMe } from "@/lib/utils";
+import { useOrbit } from "./OrbitStore";
 import { useFlow, type View } from "./flow";
 import { useTheme } from "./ThemeProvider";
-import { ThemeToggle } from "./bits";
+
+const VERSION = "v2.0.0";
 
 const TABS: { key: View["screen"]; label: string; icon: typeof Home }[] = [
-  { key: "home", label: "Home", icon: Home },
+  { key: "home", label: "Today", icon: Home },
+  { key: "actions", label: "Actions", icon: ListChecks },
   { key: "people", label: "People", icon: Users },
-  { key: "meetings", label: "Meetings", icon: FileText },
-  { key: "search", label: "Search", icon: Search },
+  { key: "meetings", label: "Meetings", icon: CalendarDays },
 ];
 
-// Below this width Orbit stays the phone-frame cockpit it was designed as; at or above it
-// (a resized macOS window, an iPad in portrait or landscape) it switches to a sidebar-nav
-// desktop layout instead of just stretching the same narrow column (v1.7). Chosen to clear
-// iPad mini's 744px portrait viewport while staying well above any iPhone width.
+// Below this width Orbit is the phone layout (top bar + bottom tabs); at or above it (a resized
+// macOS window, an iPad in portrait or landscape) the sidebar layout (v1.7). Chosen to clear
+// iPad mini's 744px portrait viewport while staying well above any iPhone width. The action
+// drawer's own phone/desktop switch (ActionDrawer.tsx, `min-[700px]:`) matches this number.
 const DESKTOP_BREAKPOINT = 700;
 
 function useIsDesktop(breakpointPx: number): boolean {
@@ -36,87 +38,102 @@ function useIsDesktop(breakpointPx: number): boolean {
 
 function useActiveTab(): View["screen"] {
   const { view } = useFlow();
-  return view.screen === "stakeholder" || view.screen === "editStakeholder" || view.screen === "addStakeholder"
-    ? "people"
-    : view.screen === "meeting" || view.screen === "editMeeting" || view.screen === "capture" || view.screen === "review"
-    ? "meetings"
-    : view.screen;
+  switch (view.screen) {
+    case "stakeholder": case "editStakeholder": case "addStakeholder": return "people";
+    case "meeting": case "editMeeting": case "meetingPrint": case "capture": case "review":
+    case "importSchedule": case "scheduleReview": return "meetings";
+    case "pendingReviews": return "home";
+    default: return view.screen;
+  }
+}
+
+// ⌘K / Ctrl+K anywhere, or "/" when not typing, opens the search palette.
+function usePaletteShortcut() {
+  const { overlay, setOverlay } = useFlow();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement as HTMLElement | null)?.tagName ?? "");
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setOverlay(overlay === "palette" ? null : "palette");
+      } else if (e.key === "/" && !typing && !overlay) {
+        e.preventDefault();
+        setOverlay("palette");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [overlay, setOverlay]);
 }
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const isDesktop = useIsDesktop(DESKTOP_BREAKPOINT);
+  usePaletteShortcut();
   return isDesktop ? <DesktopShell>{children}</DesktopShell> : <MobileShell>{children}</MobileShell>;
 }
 
-// ---- Mobile: the original phone-frame cockpit (unchanged below the breakpoint) ----
-function MobileShell({ children }: { children: React.ReactNode }) {
-  const { view, go } = useFlow();
+function ThemeButton({ withLabel }: { withLabel?: boolean }) {
   const { theme, setTheme } = useTheme();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const active = useActiveTab();
+  const dark = theme === "dark";
+  const Icon = dark ? Sun : Moon;
+  return withLabel ? (
+    <button onClick={() => setTheme(dark ? "light" : "dark")} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground">
+      <Icon className="h-[18px] w-[18px]" /> {dark ? "Light" : "Dark"} mode
+    </button>
+  ) : (
+    <button onClick={() => setTheme(dark ? "light" : "dark")} aria-label={dark ? "Switch to light mode" : "Switch to dark mode"} className="grid h-[34px] w-[34px] place-items-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground">
+      <Icon className="h-[18px] w-[18px]" />
+    </button>
+  );
+}
 
+function CaptureButton() {
+  const { setOverlay } = useFlow();
   return (
-    <div className="flex h-screen justify-center overflow-hidden">
-      <div className="relative flex h-full w-full max-w-[430px] flex-col bg-paper text-foreground">
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-paper/90 px-[18px] py-2.5 backdrop-blur">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-label="Menu"
-              className="rounded-md p-1 text-muted-foreground/70 hover:bg-secondary hover:text-foreground"
-            >
-              {menuOpen ? <X className="h-[18px] w-[18px]" /> : <Menu className="h-[18px] w-[18px]" />}
-            </button>
-            <button onClick={() => go({ screen: "home" })} className="flex items-baseline gap-1.5 text-[15px] font-bold tracking-tight">
-              Orbit
-              <span className="text-[10.5px] font-medium text-muted-foreground/60">v1.17.2</span>
-            </button>
-          </div>
-          <span className="text-[11px] font-medium text-muted-foreground/70">{fmtToday()}</span>
+    <button onClick={() => setOverlay("capture")} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3.5 py-2 text-[13.5px] font-semibold text-primary-foreground hover:bg-primary/90">
+      <Plus className="h-4 w-4" /> Capture
+    </button>
+  );
+}
+
+const Brand = ({ className }: { className?: string }) => (
+  <span className={cn("flex items-baseline gap-1.5 font-bold tracking-tight", className)}>
+    Orbit <span className="text-[11px] font-semibold text-muted-foreground/60">{VERSION}</span>
+  </span>
+);
+
+// ---- Phone: top bar + bottom tabs ----
+function MobileShell({ children }: { children: React.ReactNode }) {
+  const { nav, setOverlay } = useFlow();
+  const active = useActiveTab();
+  return (
+    <div className="flex h-screen justify-center overflow-hidden bg-paper">
+      <div className="relative flex h-full w-full max-w-[560px] flex-col text-foreground">
+        <header className="z-20 flex items-center gap-1 border-b border-border bg-paper/90 px-4 py-2.5 backdrop-blur">
+          <button onClick={() => nav({ screen: "home" })}><Brand className="text-[17px]" /></button>
+          <span className="flex-1" />
+          <button onClick={() => setOverlay("palette")} aria-label="Search" className="grid h-[34px] w-[34px] place-items-center rounded-lg text-muted-foreground hover:bg-secondary">
+            <Search className="h-[18px] w-[18px]" />
+          </button>
+          <ThemeButton />
+          <span className="ml-1"><CaptureButton /></span>
         </header>
-
-        {menuOpen && (
-          <>
-            <button
-              className="fixed inset-0 z-10 cursor-default bg-foreground/10"
-              aria-label="Close menu"
-              onClick={() => setMenuOpen(false)}
-            />
-            <div className="absolute left-[18px] top-[52px] z-20 w-[240px] overflow-hidden rounded-lg border border-primary/30 bg-card shadow-[0_8px_24px_-4px_rgba(91,95,199,0.3)]">
-              <button
-                onClick={() => { go({ screen: "weeklyReport" }); setMenuOpen(false); }}
-                className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[13.5px] font-semibold hover:bg-secondary"
-              >
-                <CalendarRange className="h-[18px] w-[18px] text-primary" /> Weekly report
-              </button>
-              <div className="border-t border-border px-4 py-3">
-                <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">Display</div>
-                <ThemeToggle theme={theme} setTheme={setTheme} />
-              </div>
-            </div>
-          </>
-        )}
-
-        <div className="app-scroll min-h-0 flex-1 overflow-y-auto px-[18px] pb-24 pt-4">
+        <div className="app-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-4">
           {children}
-          <div className="mt-10 text-center text-[11px] tracking-wide text-muted-foreground/60">
-            Orbit · Rohit Kohli
-          </div>
+          <div className="mt-10 text-center text-[11px] tracking-wide text-muted-foreground/60">Orbit · Rohit Kohli</div>
         </div>
-        <nav className="sticky bottom-0 flex border-t border-border bg-paper/90 px-1.5 pb-2.5 pt-2 backdrop-blur">
+        <nav className="flex border-t border-border bg-card/95 px-1.5 pb-[calc(8px+env(safe-area-inset-bottom,0px))] pt-1.5 backdrop-blur">
           {TABS.map((t) => {
             const Icon = t.icon;
             const on = active === t.key;
             return (
               <button
                 key={t.key}
-                onClick={() => go({ screen: t.key } as View)}
-                className={cn(
-                  "flex flex-1 flex-col items-center gap-0.5 py-1 text-[10.5px]",
-                  on ? "font-bold text-primary" : "font-medium text-muted-foreground/70"
-                )}
+                onClick={() => nav({ screen: t.key } as View)}
+                aria-current={on ? "page" : undefined}
+                className={cn("flex flex-1 flex-col items-center gap-0.5 py-1 text-[11px] font-semibold", on ? "text-accent-foreground" : "text-muted-foreground/70")}
               >
-                <Icon className="h-[21px] w-[21px]" strokeWidth={on ? 2.4 : 1.9} />
+                <Icon className="h-[21px] w-[21px]" strokeWidth={on ? 2.3 : 1.8} />
                 {t.label}
               </button>
             );
@@ -127,66 +144,56 @@ function MobileShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ---- Desktop: sidebar nav + wider content column (v1.7, macOS/iPadOS) ----
+// ---- Desktop / iPad: sidebar + top bar + centred working column ----
 function DesktopShell({ children }: { children: React.ReactNode }) {
-  const { view, go } = useFlow();
-  const { theme, setTheme } = useTheme();
+  const { meetings } = useOrbit();
+  const { nav, setOverlay } = useFlow();
   const active = useActiveTab();
+  const overdue = openCommitmentsInvolvingMe(meetings).filter(isOverdueAction).length;
+  const item = (on: boolean) => cn(
+    "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left font-semibold",
+    on ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+  );
 
   return (
     <div className="flex h-screen overflow-hidden bg-paper text-foreground">
-      <aside className="flex w-[220px] shrink-0 flex-col overflow-y-auto border-r border-border">
-        <button onClick={() => go({ screen: "home" })} className="flex items-baseline gap-1.5 px-5 py-5 text-left text-[17px] font-bold tracking-tight">
-          Orbit
-          <span className="text-[11px] font-medium text-muted-foreground/60">v1.17.2</span>
+      <aside className="flex w-[228px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border px-3 pb-4 pt-5">
+        <button onClick={() => nav({ screen: "home" })} className="px-2.5 pb-4 text-left"><Brand className="text-[18px]" /></button>
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          const on = active === t.key;
+          return (
+            <button key={t.key} onClick={() => nav({ screen: t.key } as View)} aria-current={on ? "page" : undefined} className={item(on)}>
+              <Icon className="h-[18px] w-[18px]" strokeWidth={on ? 2.3 : 1.8} />
+              {t.label}
+              {t.key === "actions" && overdue > 0 && <span className="ml-auto text-[11.5px] font-bold tabular-nums text-warm">{overdue}</span>}
+            </button>
+          );
+        })}
+        <div className="mx-2 my-2.5 h-px bg-border" />
+        <button onClick={() => nav({ screen: "weeklyReport" })} aria-current={active === "weeklyReport" ? "page" : undefined} className={item(active === "weeklyReport")}>
+          <BarChart3 className="h-[18px] w-[18px]" /> Weekly recap
         </button>
-
-        <nav className="flex flex-1 flex-col gap-0.5 px-2.5">
-          {TABS.map((t) => {
-            const Icon = t.icon;
-            const on = active === t.key;
-            return (
-              <button
-                key={t.key}
-                onClick={() => go({ screen: t.key } as View)}
-                className={cn(
-                  "flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-[13.5px] font-semibold",
-                  on ? "bg-accent text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                )}
-              >
-                <Icon className="h-[18px] w-[18px]" strokeWidth={on ? 2.4 : 1.9} />
-                {t.label}
-              </button>
-            );
-          })}
-
-          <div className="my-2 border-t border-border" />
-
-          <button
-            onClick={() => go({ screen: "weeklyReport" })}
-            className={cn(
-              "flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-[13.5px] font-semibold",
-              view.screen === "weeklyReport" ? "bg-accent text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-            )}
-          >
-            <CalendarRange className="h-[18px] w-[18px]" /> Weekly report
-          </button>
-
-          <div className="mt-4 px-1">
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">Display</div>
-            <ThemeToggle theme={theme} setTheme={setTheme} />
-          </div>
-        </nav>
-
-        <div className="px-4 pb-4 text-[11px] tracking-wide text-muted-foreground/60">Orbit · Rohit Kohli</div>
+        <div className="mt-auto flex flex-col gap-2">
+          <ThemeButton withLabel />
+          <div className="px-2.5 text-[11px] tracking-wide text-muted-foreground/60">Orbit · Rohit Kohli</div>
+        </div>
       </aside>
 
-      <div className="flex min-h-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex items-center justify-end border-b border-border bg-paper/90 px-8 py-3 backdrop-blur">
-          <span className="text-[12px] font-medium text-muted-foreground/70">{fmtToday()}</span>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="z-20 flex items-center gap-2.5 border-b border-border bg-paper/90 px-7 py-3 backdrop-blur">
+          <button
+            onClick={() => setOverlay("palette")}
+            className="flex max-w-[520px] flex-1 items-center gap-2 rounded-[9px] border border-border bg-card px-3 py-2 text-muted-foreground/70 hover:border-muted-foreground/50"
+          >
+            <Search className="h-4 w-4" /> Search or ask Orbit
+            <kbd className="ml-auto rounded border border-border px-1.5 text-[11px] font-semibold">⌘K</kbd>
+          </button>
+          <span className="flex-1" />
+          <CaptureButton />
         </header>
-        <div className="app-scroll min-h-0 flex-1 overflow-y-auto px-8 py-7">
-          <div className="mx-auto max-w-[760px]">{children}</div>
+        <div className="app-scroll min-h-0 flex-1 overflow-y-auto px-7 pb-16 pt-6">
+          <div className="mx-auto max-w-[1040px]">{children}</div>
         </div>
       </div>
     </div>

@@ -40,7 +40,7 @@ async function resizeImage(file: File): Promise<{ base64: string; mediaType: str
 }
 
 export function ImportScheduleScreen() {
-  const { go, scheduleBusy, scheduleErr, runScheduleExtraction } = useFlow();
+  const { back, scheduleBusy, scheduleErr, runScheduleExtraction } = useFlow();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [pending, setPending] = useState<{ base64: string; mediaType: string } | null>(null);
@@ -62,7 +62,7 @@ export function ImportScheduleScreen() {
   return (
     <div>
       <div className="flex items-center gap-3 py-2 pb-3">
-        <button onClick={() => go({ screen: "meetings" })} aria-label="Back to meetings"><ArrowLeft className="h-5 w-5" /></button>
+        <button onClick={back} aria-label="Back"><ArrowLeft className="h-5 w-5" /></button>
         <div className="text-[26px] font-bold tracking-tight">Import calendar</div>
       </div>
       <p className="mb-4 text-[13.5px] leading-relaxed text-muted-foreground">
