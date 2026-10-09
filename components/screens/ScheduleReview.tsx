@@ -4,7 +4,8 @@ import { ArrowLeft, Check, CircleDot, CheckCircle2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Eyebrow, SectionTitle } from "@/components/bits";
+import { useRef, useState } from "react";
+import { Eyebrow, SectionTitle, Spinner } from "@/components/bits";
 import { useFlow } from "@/components/flow";
 import { cn, fmtFull, fmtTime12h } from "@/lib/utils";
 import type { ExtractedScheduleItem, ScheduleReviewItem } from "@/lib/types";
@@ -63,9 +64,18 @@ function EntrySummary({ e, onTimeChange }: { e: ExtractedScheduleItem; onTimeCha
 }
 
 export function ScheduleReviewScreen() {
-  const { go, scheduleReview, setScheduleReview, scheduleUnchangedCount, scheduleSkippedPastCount, commitSchedule } = useFlow();
+  const { go, nav, scheduleReview, setScheduleReview, scheduleUnchangedCount, scheduleSkippedPastCount, commitSchedule } = useFlow();
 
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   if (!scheduleReview) return <div className="py-10 text-center text-muted-foreground">Nothing to review.</div>;
+  // Disabled while saving so a double tap can't insert the same meetings twice (v2.0).
+  const save = async () => {
+    if (savingRef.current) return; // a ref, so two taps before a re-render can't both save
+    savingRef.current = true;
+    setSaving(true);
+    try { await commitSchedule(); } finally { savingRef.current = false; setSaving(false); }
+  };
 
   const patch = (id: string, next: Partial<ScheduleReviewItem>) => {
     setScheduleReview(scheduleReview.map((it) => (it._id === id ? { ...it, ...next } : it)));
@@ -86,7 +96,7 @@ export function ScheduleReviewScreen() {
     return (
       <div>
         <div className="flex items-center gap-3 py-2 pb-3">
-          <button onClick={() => go({ screen: "meetings" })} aria-label="Back to meetings"><ArrowLeft className="h-5 w-5" /></button>
+          <button onClick={() => nav({ screen: "meetings", tab: "upcoming" })} aria-label="Back to meetings"><ArrowLeft className="h-5 w-5" /></button>
           <div className="text-[26px] font-bold tracking-tight">Review</div>
         </div>
         <div className="py-10 text-center text-muted-foreground">
@@ -96,7 +106,7 @@ export function ScheduleReviewScreen() {
             ? `Everything in that photo has already passed — ${scheduleSkippedPastCount} meeting${scheduleSkippedPastCount === 1 ? "" : "s"} skipped.`
             : "Nothing found in that photo."}
         </div>
-        <Button className="w-full" onClick={() => go({ screen: "meetings" })}>Back to Meetings</Button>
+        <Button className="w-full" onClick={() => nav({ screen: "meetings", tab: "upcoming" })}>Back to Meetings</Button>
       </div>
     );
   }
@@ -203,8 +213,8 @@ export function ScheduleReviewScreen() {
         </>
       )}
 
-      <Button className="mt-2 w-full" onClick={commitSchedule} disabled={includedCount === 0}>
-        <Check className="h-[18px] w-[18px]" /> Save {includedCount} meeting{includedCount === 1 ? "" : "s"}
+      <Button className="mt-2 w-full" onClick={save} disabled={includedCount === 0 || saving}>
+        {saving ? <Spinner /> : <Check className="h-[18px] w-[18px]" />} {saving ? "Saving…" : `Save ${includedCount} meeting${includedCount === 1 ? "" : "s"}`}
       </Button>
       <Button variant="secondary" className="mt-2.5 w-full" onClick={() => go({ screen: "importSchedule" })}>
         Back to photo

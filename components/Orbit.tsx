@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { OrbitProvider, useOrbit } from "./OrbitStore";
-import { FlowCtx, type Flow, type View } from "./flow";
+import { FlowCtx, type ActionRef, type Flow, type View } from "./flow";
 import { Shell } from "./Shell";
 import { HomeScreen } from "./screens/Home";
 import { PeopleScreen } from "./screens/People";
@@ -15,11 +15,14 @@ import { EditMeetingScreen } from "./screens/EditMeeting";
 import { MeetingPrintScreen } from "./screens/MeetingPrint";
 import { CaptureScreen } from "./screens/Capture";
 import { ReviewScreen } from "./screens/Review";
-import { SearchScreen } from "./screens/Search";
+import { ActionsScreen } from "./screens/Actions";
 import { WeeklyReportScreen } from "./screens/WeeklyReport";
 import { ImportScheduleScreen } from "./screens/ImportSchedule";
 import { ScheduleReviewScreen } from "./screens/ScheduleReview";
 import { Spinner } from "./bits";
+import { ActionDrawer } from "./ActionDrawer";
+import { CommandPalette } from "./CommandPalette";
+import { CaptureMenu } from "./CaptureMenu";
 import { allOpenCommitments, commitmentLabel, matchSchedule, normalizeAttendeeName, openCommitmentsDigest, todayISO, uid } from "@/lib/utils";
 import type {
   Extraction, ExtractedScheduleItem, Meeting, PendingMeetingReview, ReviewCommitmentSuggestion,
@@ -111,7 +114,25 @@ const SAMPLE_EXTRACTION: Extraction = {
 
 function Inner() {
   const store = useOrbit();
-  const [view, setView] = useState<View>({ screen: "home" });
+  const [view, setViewState] = useState<View>({ screen: "home" });
+  const history = useRef<View[]>([]);
+  const [action, setAction] = useState<ActionRef | null>(null);
+  const [overlay, setOverlay] = useState<"palette" | "capture" | null>(null);
+  const [committing, setCommitting] = useState(false);
+  const committingRef = useRef(false);
+
+  // v2.0 navigation: go() remembers the current screen so a Back button returns to wherever
+  // you actually came from (Today, a person, a meeting...); nav() is for the top-level tabs.
+  // Every navigation closes the action drawer and scrolls the content pane back to the top.
+  const scrollTop = () => document.querySelector(".app-scroll")?.scrollTo({ top: 0 });
+  const setView = (v: View) => { history.current = [...history.current.slice(-30), view]; setViewState(v); setAction(null); scrollTop(); };
+  const nav = (v: View) => { history.current = []; setViewState(v); setAction(null); scrollTop(); };
+  const back = () => {
+    const prev = history.current.pop();
+    setViewState(prev ?? { screen: "home" });
+    setAction(null);
+    scrollTop();
+  };
   const [draft, setDraft] = useState("");
   const [meetingDate, setMeetingDate] = useState(todayISO());
   const [busy, setBusy] = useState(false);
@@ -151,7 +172,7 @@ function Inner() {
       setReview(null);
       setPendingQueue([]);
       setPendingIndex(0);
-      setView({ screen: "meetings" });
+      nav({ screen: "home" });
     }
   };
 
@@ -198,7 +219,22 @@ function Inner() {
   };
 
   const commit = async () => {
-    if (!review) return;
+    // A ref, not just the `committing` state: two taps can land before React re-renders the
+    // disabled button, and a state check would let both through.
+    if (!review || committingRef.current) return;
+    committingRef.current = true;
+    setCommitting(true);
+    try {
+      await commitInner(review);
+    } finally {
+      committingRef.current = false;
+      setCommitting(false);
+    }
+  };
+
+  // The Save button is disabled while this runs (v2.0) — a double tap used to save the same
+  // meeting twice, since commitMeeting mints a fresh id on every call.
+  const commitInner = async (review: ReviewModel) => {
     // Overnight close-out queue (v1.16): same commitMeeting() as a live capture, just
     // followed by clearing the staging row and advancing to the next queued item instead of
     // resetting the transcript draft and returning to Meetings outright.
@@ -219,7 +255,7 @@ function Inner() {
     for (const s of review.commitmentSuggestions.filter((x) => x.include)) {
       await store.addCommitmentUpdate(s.meetingId, s.commitmentId, {
         note: s.reason,
-        date: meetingDate,
+        date: review.date || meetingDate, // the date as corrected on Review, not just the capture screen's
         newDueDate: s.action === "revise_date" ? s.newDueDate ?? null : undefined,
         markDone: s.action === "close",
       });
@@ -227,7 +263,7 @@ function Inner() {
     setReview(null);
     setDraft("");
     setMeetingDate(todayISO());
-    setView({ screen: "meetings" });
+    nav({ screen: "meetings" });
   };
 
   // Vision-based schedule import (v1.15). extractSchedule only reads the photo — it never
@@ -271,15 +307,17 @@ function Inner() {
     setScheduleReview(null);
     setScheduleUnchangedCount(0);
     setScheduleSkippedPastCount(0);
-    setView({ screen: "meetings" });
+    nav({ screen: "meetings", tab: "upcoming" });
   };
 
   const flow: Flow = {
-    view, go: setView, draft, setDraft, meetingDate, setMeetingDate, busy, err, review, setReview, runExtraction, loadSample, commit,
+    view, go: setView, nav, back, draft, setDraft, meetingDate, setMeetingDate, busy, err, review, setReview, runExtraction, loadSample, commit, committing,
     scheduleBusy, scheduleErr, scheduleReview, scheduleUnchangedCount, scheduleSkippedPastCount,
     setScheduleReview: (items) => setScheduleReview(items),
     runScheduleExtraction, commitSchedule,
     pendingQueue, pendingIndex, openPendingReviews, skipPendingReview,
+    action, openAction: (ref) => { setOverlay(null); setAction(ref); }, closeAction: () => setAction(null),
+    overlay, setOverlay,
   };
 
   let body: React.ReactNode;
@@ -289,13 +327,13 @@ function Inner() {
     case "stakeholder": body = <StakeholderScreen id={view.id} />; break;
     case "editStakeholder": body = <EditStakeholderScreen id={view.id} />; break;
     case "addStakeholder": body = <AddStakeholderScreen />; break;
-    case "meetings": body = <MeetingsScreen />; break;
+    case "meetings": body = <MeetingsScreen key={view.tab ?? "past"} initialTab={view.tab} />; break;
     case "meeting": body = <MeetingScreen id={view.id} />; break;
     case "editMeeting": body = <EditMeetingScreen id={view.id} />; break;
     case "meetingPrint": body = <MeetingPrintScreen id={view.id} />; break;
     case "capture": body = <CaptureScreen />; break;
     case "review": body = <ReviewScreen />; break;
-    case "search": body = <SearchScreen />; break;
+    case "actions": body = <ActionsScreen key={`${view.dir ?? ""}-${view.when ?? ""}`} dir={view.dir} when={view.when} />; break;
     case "weeklyReport": body = <WeeklyReportScreen />; break;
     case "importSchedule": body = <ImportScheduleScreen />; break;
     case "scheduleReview": body = <ScheduleReviewScreen />; break;
@@ -330,6 +368,9 @@ function Inner() {
   return (
     <FlowCtx.Provider value={flow}>
       <Shell>{body}</Shell>
+      <ActionDrawer />
+      {overlay === "palette" && <CommandPalette />}
+      {overlay === "capture" && <CaptureMenu />}
     </FlowCtx.Provider>
   );
 }

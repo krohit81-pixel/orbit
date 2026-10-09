@@ -13,7 +13,7 @@ import type { Relationship } from "@/lib/types";
 
 export function EditStakeholderScreen({ id }: { id: string }) {
   const { stakeholders, saveStakeholder, deleteStakeholder } = useOrbit();
-  const { go } = useFlow();
+  const { back, nav } = useFlow();
   const s = stakeholderById(stakeholders, id);
 
   const [name, setName] = useState(s?.name ?? "");
@@ -31,7 +31,7 @@ export function EditStakeholderScreen({ id }: { id: string }) {
     setSaving(true);
     try {
       await saveStakeholder({ ...s, name: name.trim(), title: title.trim() || "—", relationship, reportsTo: reportsTo || null });
-      go({ screen: "stakeholder", id });
+      back();
     } finally {
       setSaving(false);
     }
@@ -42,7 +42,7 @@ export function EditStakeholderScreen({ id }: { id: string }) {
     setDeleting(true);
     try {
       await deleteStakeholder(id);
-      go({ screen: "people" });
+      nav({ screen: "people" });
     } finally {
       setDeleting(false);
     }
@@ -51,7 +51,7 @@ export function EditStakeholderScreen({ id }: { id: string }) {
   return (
     <div>
       <div className="flex items-center gap-3 py-2 pb-3.5">
-        <button onClick={() => go({ screen: "stakeholder", id })}><ArrowLeft className="h-5 w-5" /></button>
+        <button onClick={back} aria-label="Back"><ArrowLeft className="h-5 w-5" /></button>
         <div className="text-[26px] font-bold tracking-tight">Edit stakeholder</div>
       </div>
 

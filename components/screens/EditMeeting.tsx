@@ -14,7 +14,7 @@ import type { Commitment, Concern, Expectation, Meeting } from "@/lib/types";
 
 export function EditMeetingScreen({ id }: { id: string }) {
   const { meetings, stakeholders, saveMeeting, deleteMeeting } = useOrbit();
-  const { go } = useFlow();
+  const { back, nav } = useFlow();
   const original = meetings.find((m) => m.id === id);
   const [m, setM] = useState<Meeting | null>(original ?? null);
   const [confirming, setConfirming] = useState(false);
@@ -64,7 +64,7 @@ export function EditMeetingScreen({ id }: { id: string }) {
     setSaving(true);
     try {
       await saveMeeting(m);
-      go({ screen: "meeting", id });
+      back();
     } finally {
       setSaving(false);
     }
@@ -74,7 +74,7 @@ export function EditMeetingScreen({ id }: { id: string }) {
     setDeleting(true);
     try {
       await deleteMeeting(id);
-      go({ screen: "meetings" });
+      nav({ screen: "meetings" });
     } finally {
       setDeleting(false);
     }
@@ -83,7 +83,7 @@ export function EditMeetingScreen({ id }: { id: string }) {
   return (
     <div>
       <div className="flex items-center gap-3 py-2 pb-3">
-        <button onClick={() => go({ screen: "meeting", id })}><ArrowLeft className="h-5 w-5" /></button>
+        <button onClick={back} aria-label="Back"><ArrowLeft className="h-5 w-5" /></button>
         <div className="text-[26px] font-bold tracking-tight">Edit meeting</div>
       </div>
 

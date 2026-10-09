@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import * as db from "@/lib/db";
 import { supabaseConfigured } from "@/lib/supabase/client";
 import { uid } from "@/lib/utils";
-import type { Meeting, PendingMeetingReview, ReviewModel, ScheduleReviewItem, Stakeholder, UpcomingMeeting } from "@/lib/types";
+import type { CommitmentUpdate, Meeting, PendingMeetingReview, ReviewModel, ScheduleReviewItem, Stakeholder, UpcomingMeeting } from "@/lib/types";
 
 interface OrbitContextValue {
   ready: boolean;
@@ -25,7 +25,7 @@ interface OrbitContextValue {
   toggleCommitment: (meetingId: string, commId: string) => Promise<void>;
   resolveConcern: (meetingId: string, concernId: string, resolution: "mitigated" | "no_longer_relevant") => Promise<void>;
   reopenConcern: (meetingId: string, concernId: string) => Promise<void>;
-  addCommitmentUpdate: (meetingId: string, commId: string, input: { note: string; date: string; newDueDate?: string | null; markDone?: boolean }) => Promise<void>;
+  addCommitmentUpdate: (meetingId: string, commId: string, input: { note: string; date: string; newDueDate?: string | null; markDone?: boolean; kind?: CommitmentUpdate["kind"] }) => Promise<void>;
   setSummary: (sid: string, summary: string) => Promise<void>;
   commitSchedule: (items: ScheduleReviewItem[]) => Promise<void>;
   saveUpcomingMeetingNotes: (id: string, notes: string) => Promise<void>;
@@ -226,14 +226,15 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Append-only progress log for a commitment, with an optional due-date revision recorded
-  // alongside it (v1.8), and an optional markDone (v1.12, for suggestions accepted out of
+  // alongside it (v1.8), an optional kind (v2.0 — "follow_up" for the Follow up action on
+  // something owed to the owner, which is how "awaiting reply" is derived), and an optional markDone (v1.12, for suggestions accepted out of
   // Review — see Orbit.tsx's commit()) that also closes the commitment in the same write.
   // Follows toggleCommitment's optimistic-then-rollback shape, since this is a
   // data-integrity write like any other.
   const addCommitmentUpdate = useCallback(async (
     meetingId: string,
     commId: string,
-    input: { note: string; date: string; newDueDate?: string | null; markDone?: boolean }
+    input: { note: string; date: string; newDueDate?: string | null; markDone?: boolean; kind?: CommitmentUpdate["kind"] }
   ) => {
     let prevCommitments: Meeting["commitments"] | null = null;
     let nextCommitments: Meeting["commitments"] | null = null;
@@ -250,6 +251,7 @@ export function OrbitProvider({ children }: { children: React.ReactNode }) {
           dueDateBefore: revisingDue ? cm.dueDate ?? null : undefined,
           dueDateAfter: revisingDue ? input.newDueDate ?? null : undefined,
           createdAt: new Date().toISOString(),
+          ...(input.kind ? { kind: input.kind } : {}),
         };
         return {
           ...cm,
