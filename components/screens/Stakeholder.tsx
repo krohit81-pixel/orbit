@@ -7,6 +7,7 @@ import { ActionRow } from "@/components/ActionRow";
 import { WatchRow } from "@/components/WatchRow";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
+import { RELATIONSHIP_HUE } from "@/lib/hues";
 import { agoLabel, fmtDate, fmtStamp, intel, relationshipHealth, sortByUrgency, stakeholderById, trajectory } from "@/lib/utils";
 
 // A person (v2.0): who they are and how it's going, what's open between you in each direction,
@@ -74,10 +75,10 @@ export function StakeholderScreen({ id }: { id: string }) {
       <div className="mb-4 flex items-start gap-3.5">
         <Avatar name={s.name} size="lg" />
         <div className="min-w-0">
-          <h1 className="text-balance text-[26px] font-bold leading-tight tracking-[-0.015em]">{s.name}</h1>
+          <h1 className="o-h1 text-balance text-[26px] font-bold leading-tight tracking-[-0.015em]">{s.name}</h1>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-muted-foreground">
             <span>{s.title}</span>
-            <Tag tone="plain">{s.relationship}</Tag>
+            <Tag tone="plain" hue={RELATIONSHIP_HUE[s.relationship]}>{s.relationship}</Tag>
             {manager && <button className="hover:underline" onClick={() => go({ screen: "stakeholder", id: manager.id })}>Reports to {manager.name}</button>}
             <span>{last ? `Last met ${agoLabel(last.date)}` : it.mentionedIn.length ? `Not met yet · mentioned in ${it.mentionedIn.length}` : "Not met yet"}</span>
             {health.stars !== null && <span className="inline-flex items-center gap-1.5"><HealthDots stars={health.stars} /><span className="text-muted-foreground/70">{healthLabel(health.stars)}</span></span>}
@@ -110,16 +111,16 @@ export function StakeholderScreen({ id }: { id: string }) {
         </Panel>
 
         <div className="grid items-start gap-4 lg:grid-cols-2">
-          <Panel title={<><ArrowUpRight className="h-3.5 w-3.5" /> You owe {first}</>} count={youOwe.length}>
+          <Panel hue="orange" title={<><ArrowUpRight className="h-3.5 w-3.5" /> You owe {first}</>} count={youOwe.length}>
             {youOwe.length ? youOwe.map((c) => <ActionRow key={c.id} c={c} meeting={c.meeting} hidePerson />) : <PanelEmpty>Nothing open.</PanelEmpty>}
           </Panel>
-          <Panel title={<><ArrowDownLeft className="h-3.5 w-3.5" /> {first} owes you</>} count={owesYou.length}>
+          <Panel hue="green" title={<><ArrowDownLeft className="h-3.5 w-3.5" /> {first} owes you</>} count={owesYou.length}>
             {owesYou.length ? owesYou.map((c) => <ActionRow key={c.id} c={c} meeting={c.meeting} hidePerson nudge />) : <PanelEmpty>Nothing open.</PanelEmpty>}
           </Panel>
         </div>
 
         {watch.length > 0 && (
-          <Panel title={<><Eye className="h-3.5 w-3.5" /> Watch</>} count={watch.filter((w) => w.c.status !== "resolved").length}>
+          <Panel hue="violet" title={<><Eye className="h-3.5 w-3.5" /> Watch</>} count={watch.filter((w) => w.c.status !== "resolved").length}>
             {watch.map(({ c, meeting }) => <WatchRow key={c.id} concern={c} meeting={meeting} recurring={recurringIds.has(c.id)} hidePerson />)}
           </Panel>
         )}
@@ -139,7 +140,7 @@ export function StakeholderScreen({ id }: { id: string }) {
           </Panel>
         )}
 
-        <Panel title="History" count={it.mentionedIn.length}>
+        <Panel hue="teal" title="History" count={it.mentionedIn.length}>
           {it.mentionedIn.length === 0 && <PanelEmpty>No meetings yet.</PanelEmpty>}
           {it.mentionedIn.map((m) => {
             const n = m.commitments.filter((c) => c.ownerId === id || c.owedToId === id).length;
@@ -147,7 +148,7 @@ export function StakeholderScreen({ id }: { id: string }) {
               <button
                 key={m.id}
                 onClick={() => go({ screen: "meeting", id: m.id })}
-                className="grid w-full grid-cols-[64px_minmax(0,1fr)] gap-3 border-t border-border px-4 py-2.5 text-left last:rounded-b-xl hover:bg-secondary"
+                className="o-row grid w-full grid-cols-[64px_minmax(0,1fr)] gap-3 border-t border-border px-4 py-2.5 text-left last:rounded-b-xl hover:bg-secondary"
               >
                 <span className="pt-px text-[12.5px] font-semibold tabular-nums text-muted-foreground">{fmtDate(m.date)}</span>
                 <span className="min-w-0">

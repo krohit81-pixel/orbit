@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, HealthDots, PageHead, Panel, PanelEmpty, Tag } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
+import { RELATIONSHIP_HUE } from "@/lib/hues";
 import { agoLabel, intel, isOverdueAction, matchesQuery, relationshipHealth } from "@/lib/utils";
 
 // Everyone, most in need of attention first: overdue items between you, then most recently met.
@@ -35,7 +36,7 @@ export function PeopleScreen() {
         title="People"
         right={<Button variant="secondary" size="sm" onClick={() => go({ screen: "addStakeholder" })}><Plus className="h-3.5 w-3.5" /> Add person</Button>}
       />
-      <label className="mb-3.5 flex items-center gap-2 rounded-[9px] border border-border bg-card px-3 py-[7px] focus-within:border-primary">
+      <label className="o-field mb-3.5 flex items-center gap-2 rounded-[9px] border border-border bg-card px-3 py-[7px] focus-within:border-primary">
         <Search className="h-3.5 w-3.5 text-muted-foreground" />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a person, role or relationship" aria-label="Find a person" className="w-full min-w-0 bg-transparent outline-none" />
       </label>
@@ -45,14 +46,14 @@ export function PeopleScreen() {
             <button
               key={s.id}
               onClick={() => go({ screen: "stakeholder", id: s.id })}
-              className="flex w-full items-center gap-3 border-t border-border px-4 py-2.5 text-left first:rounded-t-xl last:rounded-b-xl hover:bg-secondary"
+              className="o-row flex w-full items-center gap-3 border-t border-border px-4 py-2.5 text-left first:rounded-t-xl last:rounded-b-xl hover:bg-secondary"
             >
               <Avatar name={s.name} />
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{s.name}</div>
                 <div className="mt-[3px] flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
                   <span className="truncate">{s.title}</span>
-                  <Tag tone="plain">{s.relationship}</Tag>
+                  <Tag tone="plain" hue={RELATIONSHIP_HUE[s.relationship]}>{s.relationship}</Tag>
                 </div>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1.5">

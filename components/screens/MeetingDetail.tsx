@@ -7,6 +7,7 @@ import { ActionRow } from "@/components/ActionRow";
 import { WatchRow } from "@/components/WatchRow";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
+import { hueStyle, personHue } from "@/lib/hues";
 import { recurringConcernIds, stakeholderById } from "@/lib/utils";
 
 // A meeting (v2.0): summary and decisions up front, then what it produced (actions, watch
@@ -57,12 +58,12 @@ export function MeetingScreen({ id }: { id: string }) {
           <button onClick={() => go({ screen: "editMeeting", id })} className={linkBtn}><Pencil className="h-3.5 w-3.5" /> Edit</button>
         </span>
       </div>
-      <div className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">{date}</div>
-      <h1 className="mt-0.5 text-balance text-[26px] font-bold leading-tight tracking-[-0.015em]">{m.title}</h1>
+      <div className="o-eyebrow text-[11.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">{date}</div>
+      <h1 className="o-h1 mt-0.5 text-balance text-[26px] font-bold leading-tight tracking-[-0.015em]">{m.title}</h1>
       {people.length > 0 && (
         <div className="mb-[18px] mt-2.5 flex flex-wrap gap-1.5">
           {people.map((p) => (
-            <button key={p.id} onClick={() => go({ screen: "stakeholder", id: p.id })} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card py-[3px] pl-[3px] pr-2.5 text-[12.5px] font-semibold hover:border-primary">
+            <button key={p.id} style={hueStyle(personHue(p.name))} onClick={() => go({ screen: "stakeholder", id: p.id })} className="o-pchip inline-flex items-center gap-1.5 rounded-full border border-border bg-card py-[3px] pl-[3px] pr-2.5 text-[12.5px] font-semibold hover:border-primary">
               <Avatar name={p.name} size="xs" />{p.name}
             </button>
           ))}
@@ -80,12 +81,12 @@ export function MeetingScreen({ id }: { id: string }) {
           )}
         </Panel>
 
-        <Panel title="Actions from this meeting" count={m.commitments.length}>
+        <Panel hue="indigo" title="Actions from this meeting" count={m.commitments.length}>
           {m.commitments.length ? m.commitments.map((c) => <ActionRow key={c.id} c={c} meeting={m} hideSource nudge />) : <PanelEmpty>No actions came out of this meeting.</PanelEmpty>}
         </Panel>
 
         {m.concerns.length > 0 && (
-          <Panel title={<><Eye className="h-3.5 w-3.5" /> Watch</>} count={m.concerns.filter((c) => c.status !== "resolved").length}>
+          <Panel hue="violet" title={<><Eye className="h-3.5 w-3.5" /> Watch</>} count={m.concerns.filter((c) => c.status !== "resolved").length}>
             {m.concerns.map((c) => <WatchRow key={c.id} concern={c} meeting={m} recurring={recurring.has(c.id)} />)}
           </Panel>
         )}

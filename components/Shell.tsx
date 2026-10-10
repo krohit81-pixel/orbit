@@ -5,9 +5,9 @@ import { BarChart3, CalendarDays, Home, ListChecks, Moon, Plus, Search, Sun, Use
 import { cn, isOverdueAction, openCommitmentsInvolvingMe } from "@/lib/utils";
 import { useOrbit } from "./OrbitStore";
 import { useFlow, type View } from "./flow";
-import { useTheme } from "./ThemeProvider";
+import { LOOKS, useTheme, type Look } from "./ThemeProvider";
 
-const VERSION = "v2.1.0";
+const VERSION = "v2.2.0";
 
 const TABS: { key: View["screen"]; label: string; icon: typeof Home }[] = [
   { key: "home", label: "Today", icon: Home },
@@ -77,7 +77,7 @@ function ThemeButton({ withLabel }: { withLabel?: boolean }) {
   const dark = theme === "dark";
   const Icon = dark ? Sun : Moon;
   return withLabel ? (
-    <button onClick={() => setTheme(dark ? "light" : "dark")} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground">
+    <button onClick={() => setTheme(dark ? "light" : "dark")} className="o-nav flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground">
       <Icon className="h-[18px] w-[18px]" /> {dark ? "Light" : "Dark"} mode
     </button>
   ) : (
@@ -87,10 +87,43 @@ function ThemeButton({ withLabel }: { withLabel?: boolean }) {
   );
 }
 
+const LOOK_LABEL: Record<Look, string> = { calm: "Calm", rainbow: "Rainbow", wild: "Wild" };
+
+// v2.2 display setting: how much colour Orbit uses. A three-way switch in the sidebar; a single
+// button that cycles through the looks on a phone (its dot previews the current one).
+function LookSwitch() {
+  const { look, setLook } = useTheme();
+  return (
+    <div className="o-look flex gap-1 rounded-[9px] bg-secondary p-[3px]" role="group" aria-label="Colour look">
+      {LOOKS.map((l) => (
+        <button
+          key={l}
+          data-look={l}
+          aria-pressed={look === l}
+          onClick={() => setLook(l)}
+          className={cn("flex-1 rounded-[7px] py-[5px] text-[12.5px] font-semibold", look === l ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")}
+        >
+          {LOOK_LABEL[l]}
+        </button>
+      ))}
+    </div>
+  );
+}
+function LookCycleButton() {
+  const { look, setLook } = useTheme();
+  const next = LOOKS[(LOOKS.indexOf(look) + 1) % LOOKS.length];
+  const dot = look === "wild" ? "var(--sunset)" : look === "rainbow" ? "var(--rainbow)" : "hsl(var(--primary))";
+  return (
+    <button onClick={() => setLook(next)} aria-label={`Colour look: ${LOOK_LABEL[look]}. Switch to ${LOOK_LABEL[next]}`} className="grid h-[34px] w-[34px] place-items-center rounded-lg hover:bg-secondary">
+      <span className="block h-[18px] w-[18px] rounded-full" style={{ background: dot }} />
+    </button>
+  );
+}
+
 function CaptureButton() {
   const { setOverlay } = useFlow();
   return (
-    <button onClick={() => setOverlay("capture")} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3.5 py-2 text-[13.5px] font-semibold text-primary-foreground hover:bg-primary/90">
+    <button onClick={() => setOverlay("capture")} className="o-capture inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3.5 py-2 text-[13.5px] font-semibold text-primary-foreground hover:bg-primary/90">
       <Plus className="h-4 w-4" /> Capture
     </button>
   );
@@ -98,7 +131,7 @@ function CaptureButton() {
 
 const Brand = ({ className }: { className?: string }) => (
   <span className={cn("flex items-baseline gap-1.5 font-bold tracking-tight", className)}>
-    Orbit <span className="text-[11px] font-semibold text-muted-foreground/60">{VERSION}</span>
+    <span className="o-brand">Orbit</span> <span className="o-side-text text-[11px] font-semibold text-muted-foreground/60">{VERSION}</span>
   </span>
 );
 
@@ -107,14 +140,15 @@ function MobileShell({ children }: { children: React.ReactNode }) {
   const { nav, setOverlay } = useFlow();
   const active = useActiveTab();
   return (
-    <div className="flex h-screen justify-center overflow-hidden bg-paper">
+    <div className="o-app flex h-screen justify-center overflow-hidden bg-paper">
       <div className="relative flex h-full w-full max-w-[560px] flex-col text-foreground">
-        <header className="z-20 flex items-center gap-1 border-b border-border bg-paper/90 px-4 py-2.5 backdrop-blur">
+        <header className="o-topbar z-20 flex items-center gap-1 border-b border-border bg-paper/90 px-4 py-2.5 backdrop-blur">
           <button onClick={() => nav({ screen: "home" })}><Brand className="text-[17px]" /></button>
           <span className="flex-1" />
           <button onClick={() => setOverlay("palette")} aria-label="Search" className="grid h-[34px] w-[34px] place-items-center rounded-lg text-muted-foreground hover:bg-secondary">
             <Search className="h-[18px] w-[18px]" />
           </button>
+          <LookCycleButton />
           <ThemeButton />
           <span className="ml-1"><CaptureButton /></span>
         </header>
@@ -122,7 +156,7 @@ function MobileShell({ children }: { children: React.ReactNode }) {
           {children}
           <div className="mt-10 text-center text-[11px] tracking-wide text-muted-foreground/60">Orbit · Rohit Kohli</div>
         </div>
-        <nav className="flex border-t border-border bg-card/95 px-1.5 pb-[calc(8px+env(safe-area-inset-bottom,0px))] pt-1.5 backdrop-blur">
+        <nav className="o-tabs flex border-t border-border bg-card/95 px-1.5 pb-[calc(8px+env(safe-area-inset-bottom,0px))] pt-1.5 backdrop-blur">
           {TABS.map((t) => {
             const Icon = t.icon;
             const on = active === t.key;
@@ -131,7 +165,8 @@ function MobileShell({ children }: { children: React.ReactNode }) {
                 key={t.key}
                 onClick={() => nav({ screen: t.key } as View)}
                 aria-current={on ? "page" : undefined}
-                className={cn("flex flex-1 flex-col items-center gap-0.5 py-1 text-[11px] font-semibold", on ? "text-accent-foreground" : "text-muted-foreground/70")}
+                data-nav={t.key}
+                className={cn("o-tab flex flex-1 flex-col items-center gap-0.5 py-1 text-[11px] font-semibold", on ? "text-accent-foreground" : "text-muted-foreground/70")}
               >
                 <Icon className="h-[21px] w-[21px]" strokeWidth={on ? 2.3 : 1.8} />
                 {t.label}
@@ -151,40 +186,41 @@ function DesktopShell({ children }: { children: React.ReactNode }) {
   const active = useActiveTab();
   const overdue = openCommitmentsInvolvingMe(meetings).filter(isOverdueAction).length;
   const item = (on: boolean) => cn(
-    "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left font-semibold",
+    "o-nav flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left font-semibold",
     on ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground"
   );
 
   return (
-    <div className="flex h-screen overflow-hidden bg-paper text-foreground">
-      <aside className="flex w-[228px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border px-3 pb-4 pt-5">
+    <div className="o-app flex h-screen overflow-hidden bg-paper text-foreground">
+      <aside className="o-side flex w-[228px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border px-3 pb-4 pt-5">
         <button onClick={() => nav({ screen: "home" })} className="px-2.5 pb-4 text-left"><Brand className="text-[18px]" /></button>
         {TABS.map((t) => {
           const Icon = t.icon;
           const on = active === t.key;
           return (
-            <button key={t.key} onClick={() => nav({ screen: t.key } as View)} aria-current={on ? "page" : undefined} className={item(on)}>
+            <button key={t.key} data-nav={t.key} onClick={() => nav({ screen: t.key } as View)} aria-current={on ? "page" : undefined} className={item(on)}>
               <Icon className="h-[18px] w-[18px]" strokeWidth={on ? 2.3 : 1.8} />
               {t.label}
-              {t.key === "actions" && overdue > 0 && <span className="ml-auto text-[11.5px] font-bold tabular-nums text-warm">{overdue}</span>}
+              {t.key === "actions" && overdue > 0 && <span className="o-count ml-auto text-[11.5px] font-bold tabular-nums text-warm">{overdue}</span>}
             </button>
           );
         })}
-        <div className="mx-2 my-2.5 h-px bg-border" />
-        <button onClick={() => nav({ screen: "weeklyReport" })} aria-current={active === "weeklyReport" ? "page" : undefined} className={item(active === "weeklyReport")}>
+        <div className="o-sep mx-2 my-2.5 h-px bg-border" />
+        <button data-nav="weeklyReport" onClick={() => nav({ screen: "weeklyReport" })} aria-current={active === "weeklyReport" ? "page" : undefined} className={item(active === "weeklyReport")}>
           <BarChart3 className="h-[18px] w-[18px]" /> Weekly recap
         </button>
         <div className="mt-auto flex flex-col gap-2">
+          <LookSwitch />
           <ThemeButton withLabel />
-          <div className="px-2.5 text-[11px] tracking-wide text-muted-foreground/60">Orbit · Rohit Kohli</div>
+          <div className="o-side-text px-2.5 text-[11px] tracking-wide text-muted-foreground/60">Orbit · Rohit Kohli</div>
         </div>
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="z-20 flex items-center gap-2.5 border-b border-border bg-paper/90 px-7 py-3 backdrop-blur">
+        <header className="o-topbar z-20 flex items-center gap-2.5 border-b border-border bg-paper/90 px-7 py-3 backdrop-blur">
           <button
             onClick={() => setOverlay("palette")}
-            className="flex max-w-[520px] flex-1 items-center gap-2 rounded-[9px] border border-border bg-card px-3 py-2 text-muted-foreground/70 hover:border-muted-foreground/50"
+            className="o-search flex max-w-[520px] flex-1 items-center gap-2 rounded-[9px] border border-border bg-card px-3 py-2 text-muted-foreground/70 hover:border-muted-foreground/50"
           >
             <Search className="h-4 w-4" /> Search or ask Orbit
             <kbd className="ml-auto rounded border border-border px-1.5 text-[11px] font-semibold">⌘K</kbd>
