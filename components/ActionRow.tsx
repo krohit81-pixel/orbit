@@ -5,7 +5,7 @@ import { ArrowDownLeft, ArrowUpRight, Check } from "lucide-react";
 import { DueChip, MiniButton, Spinner, Tag } from "@/components/bits";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
-import { actionDir, agoLabel, cn, commitmentLabel, counterpartyName, isOverdueAction, lastFollowUp, awaitingReply } from "@/lib/utils";
+import { actionDir, agoLabel, cn, commitmentLabel, counterpartyName, dueNote, isOverdueAction, lastFollowUp, awaitingReply } from "@/lib/utils";
 import type { Commitment, Meeting } from "@/lib/types";
 
 export function DirIcon({ c, className }: { c: Commitment; className?: string }) {
@@ -60,7 +60,10 @@ export function ActionRow({
         {busy ? <Spinner className="h-3 w-3 text-muted-foreground" /> : <Check className="h-3 w-3" strokeWidth={3} />}
       </button>
       <div className="min-w-0 flex-1">
-        <div className={cn("font-medium leading-snug", done && "text-muted-foreground/70 line-through")}>{c.text}</div>
+        <div className={cn("break-words font-medium leading-snug", done && "text-muted-foreground/70 line-through")}>{c.text}</div>
+        {dueNote(c.dueDate, c.due) && !done && (
+          <div className="mt-0.5 text-[12.5px] italic text-muted-foreground">When: {dueNote(c.dueDate, c.due)}</div>
+        )}
         <div className="mt-[3px] flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-muted-foreground">
           {!hidePerson && (directional
             ? <span>{counterpartyName(c, stakeholders)}</span>

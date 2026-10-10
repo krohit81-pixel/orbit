@@ -110,7 +110,7 @@ export function ActionDrawer() {
                   ) : <span className="text-muted-foreground">No one named</span>}
                 </dd>
                 <dt className="text-[12.5px] font-semibold text-muted-foreground/70">Due</dt>
-                <dd className="flex items-center gap-2">
+                <dd className="flex min-w-0 flex-wrap items-center gap-2">
                   <input
                     type="date"
                     aria-label="Due date"
