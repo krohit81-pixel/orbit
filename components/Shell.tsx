@@ -7,7 +7,7 @@ import { useOrbit } from "./OrbitStore";
 import { useFlow, type View } from "./flow";
 import { useTheme } from "./ThemeProvider";
 
-const VERSION = "v2.0.0";
+const VERSION = "v2.1.0";
 
 const TABS: { key: View["screen"]; label: string; icon: typeof Home }[] = [
   { key: "home", label: "Today", icon: Home },

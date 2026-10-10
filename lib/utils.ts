@@ -283,9 +283,24 @@ export function agoLabel(iso: string): string {
 // The due-date pill on every action row (v2.0). Red only when overdue, amber for the next
 // three days, neutral otherwise — less colour noise than v1's four-colour tiles.
 export interface DueChipInfo { tone: "red" | "amber" | "plain"; label: string }
+// v2.1: a free-text `due` ("before FY27 budgeting begins") only goes in the chip when it's
+// short; a longer phrase made the chip as wide as the row on a phone and squeezed the action
+// text into a one-word column. Long phrases are shown in full by dueNote() instead.
+const CHIP_TEXT_MAX = 14;
+// Phrases the model sometimes writes into `due` that only mean "no date" — shown as plain
+// "No date" rather than echoed back as if they were a timeframe.
+const NO_DATE_FILLER = /^(no (specific |due |set )?(due )?date( set| specified| given| mentioned)?|not (specified|set|given|mentioned)|none|n\/?a|tbd|tbc|unspecified|unknown)\.?$/i;
+const dueText = (due?: string | null) => { const t = (due || "").trim(); return NO_DATE_FILLER.test(t) ? "" : t; };
+export function dueNote(dueDate?: string | null, due?: string | null): string | null {
+  const t = dueText(due);
+  return !dueDate && t.length > CHIP_TEXT_MAX ? t : null;
+}
 export function dueChip(dueDate?: string | null, due?: string | null, done?: boolean): DueChipInfo {
   if (done) return { tone: "plain", label: "Done" };
-  if (!dueDate) return { tone: "plain", label: due || "No date" };
+  if (!dueDate) {
+    const t = dueText(due);
+    return { tone: "plain", label: t && t.length <= CHIP_TEXT_MAX ? t : "No date" };
+  }
   const n = daysFromToday(dueDate);
   if (n < 0) return { tone: "red", label: `${-n}d overdue` };
   if (n === 0) return { tone: "amber", label: "Today" };

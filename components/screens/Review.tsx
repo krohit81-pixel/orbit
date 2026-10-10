@@ -4,7 +4,7 @@ import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Check, Eye, Sparkles } from "lu
 import { Button } from "@/components/ui/button";
 import { DueChip, MiniButton, PageHead, Panel, PanelEmpty, Spinner, Tag } from "@/components/bits";
 import { useFlow } from "@/components/flow";
-import { cn, fmtFull } from "@/lib/utils";
+import { cn, dueNote, fmtFull } from "@/lib/utils";
 import type { ReviewModel } from "@/lib/types";
 
 const SUGGESTION_LABEL: Record<string, string> = {
@@ -40,7 +40,15 @@ export function ReviewScreen() {
     </button>
   );
   const item = (on: boolean) => cn("flex items-start gap-3 border-t border-border px-4 py-2.5", !on && "opacity-45");
-  const label = (who: string) => (who === "me" ? "You" : who.split(" ")[0]);
+  const first = (who: string) => who.split(" ")[0];
+  // Direction text for a proposed commitment; owner/owedTo can be null when the transcript
+  // didn't make it clear (v2.1 — this used to crash the screen).
+  const dirText = (owner: string | null, owedTo: string | null) => {
+    if (owner === "me") return owedTo && owedTo !== "me" ? `You owe ${first(owedTo)}` : "You owe";
+    if (owedTo === "me") return owner ? `${first(owner)} owes you` : "Someone owes you";
+    if (owner) return owedTo ? `${first(owner)} owes ${first(owedTo)}` : `${first(owner)} committed`;
+    return "Owner unclear";
+  };
 
   return (
     <div className="max-w-[760px]">
@@ -100,11 +108,12 @@ export function ReviewScreen() {
             <div key={x._id} className={item(x.include)}>
               <Tick on={x.include} onClick={() => toggle("commitments", x._id)} />
               <div className="min-w-0 flex-1">
-                <div className="font-medium leading-snug">{x.text}</div>
+                <div className="break-words font-medium leading-snug">{x.text}</div>
+                {dueNote(x.dueDate, x.due) && <div className="mt-0.5 text-[12.5px] italic text-muted-foreground">When: {dueNote(x.dueDate, x.due)}</div>}
                 <div className="mt-[3px] flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
                   <span className="inline-flex items-center gap-[3px] font-semibold">
                     {x.owner === "me" ? <ArrowUpRight className="h-[13px] w-[13px]" /> : x.owedTo === "me" ? <ArrowDownLeft className="h-[13px] w-[13px]" /> : null}
-                    {x.owner === "me" ? (x.owedTo ? `You owe ${label(x.owedTo)}` : "You owe") : `${label(x.owner)} owes ${x.owedTo ? (x.owedTo === "me" ? "you" : label(x.owedTo)) : "someone"}`}
+                    {dirText(x.owner, x.owedTo)}
                   </span>
                   {((x.owner === "me" && x.owedTo) || (x.owedTo === "me" && x.owner)) && <MiniButton onClick={() => swap(x._id)}>Swap direction</MiniButton>}
                 </div>

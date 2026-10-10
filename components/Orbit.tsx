@@ -23,6 +23,7 @@ import { Spinner } from "./bits";
 import { ActionDrawer } from "./ActionDrawer";
 import { CommandPalette } from "./CommandPalette";
 import { CaptureMenu } from "./CaptureMenu";
+import { ScreenBoundary } from "./ScreenBoundary";
 import { allOpenCommitments, commitmentLabel, matchSchedule, normalizeAttendeeName, openCommitmentsDigest, todayISO, uid } from "@/lib/utils";
 import type {
   Extraction, ExtractedScheduleItem, Meeting, PendingMeetingReview, ReviewCommitmentSuggestion,
@@ -84,7 +85,23 @@ function buildReview(
     topics: ex.topics || [],
     people,
     expectations: (ex.expectations || []).map((x) => ({ ...x, _id: uid(), include: true })),
-    commitments: (ex.commitments || []).map((x) => ({ ...x, owedTo: x.owedTo ?? null, _id: uid(), include: true })),
+    // v2.1: normalise what the model returned before it reaches the UI — a missing owner is
+    // allowed by the prompt ("null if unclear") and crashed the 2.0 Review screen; a non-ISO
+    // dueDate ("next week") is demoted to the human-readable `due` label, same rule the overnight
+    // cron already applies (Design Decision #52), so bucketDue() never sees an Invalid Date.
+    commitments: (ex.commitments || []).map((x) => {
+      const isoDue = typeof x.dueDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x.dueDate);
+      return {
+        ...x,
+        text: x.text || "(no text)",
+        owner: x.owner || null,
+        owedTo: x.owedTo || null,
+        dueDate: isoDue ? x.dueDate : null,
+        due: x.due || (!isoDue && x.dueDate ? x.dueDate : null),
+        _id: uid(),
+        include: true,
+      };
+    }),
     concerns: (ex.concerns || []).map((x) => ({ ...x, _id: uid(), include: true })),
     decisions: ex.decisions || [],
     actionItems: ex.actionItems || [],
@@ -367,7 +384,7 @@ function Inner() {
 
   return (
     <FlowCtx.Provider value={flow}>
-      <Shell>{body}</Shell>
+      <Shell><ScreenBoundary key={JSON.stringify(view)} onHome={() => nav({ screen: "home" })}>{body}</ScreenBoundary></Shell>
       <ActionDrawer />
       {overlay === "palette" && <CommandPalette />}
       {overlay === "capture" && <CaptureMenu />}

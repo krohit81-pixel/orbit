@@ -104,8 +104,10 @@ export function DueChip({ dueDate, due, done, className }: { dueDate?: string | 
   const { tone, label } = dueChip(dueDate, due, done);
   return (
     <span
+      title={label}
       className={cn(
-        "shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[12px] font-semibold tabular-nums",
+        // max-w + truncate is a backstop: the label is already kept short by dueChip()
+        "max-w-[9rem] shrink-0 truncate whitespace-nowrap rounded-full px-2 py-0.5 text-[12px] font-semibold tabular-nums",
         tone === "red" && "bg-warm/10 text-warm",
         tone === "amber" && "bg-caution/10 text-caution",
         tone === "plain" && "bg-secondary text-muted-foreground",
