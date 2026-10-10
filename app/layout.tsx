@@ -2,7 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
-const THEME_INIT_SCRIPT = `try{if(localStorage.getItem('orbit-theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}`;
+// Applies the saved theme and look (v2.2) before first paint, so neither flashes on load.
+const THEME_INIT_SCRIPT = `try{var c=document.documentElement.classList;if(localStorage.getItem('orbit-theme')==='dark')c.add('dark');var l=localStorage.getItem('orbit-look');if(l==='rainbow'||l==='wild')c.add('rb');if(l==='wild')c.add('wild')}catch(e){}`;
 
 export const metadata: Metadata = {
   title: "Orbit",
@@ -23,7 +24,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>

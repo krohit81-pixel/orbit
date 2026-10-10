@@ -91,3 +91,131 @@
 }
 
 .app-scroll::-webkit-scrollbar { width: 0; background: transparent; }
+
+/* =====================================================================================
+   Looks (v2.2): Calm (default, nothing below applies) / Rainbow (html.rb) / Wild (html.rb.wild)
+   Components set --h / --hf / --hi inline via lib/hues.ts and carry o-* hook classes; these
+   rules only restyle. Colour stays meaningful: the rainbow marks sections, people and
+   relationships, while due-date red/amber keep meaning overdue / due soon in every look.
+   ===================================================================================== */
+:root {
+  --c-red: #e5484d; --c-orange: #ee6d1a; --c-yellow: #d09a00; --c-green: #2a9d5c; --c-teal: #0f9aa6;
+  --c-blue: #2b7de0; --c-indigo: #5b5fc7; --c-violet: #9150d8; --c-pink: #d53f9a;
+  /* deeper fills, identical in both themes so white text on them always reads */
+  --f-red: #d63a40; --f-orange: #dc5f0c; --f-yellow: #e2a500; --f-green: #1f8a52; --f-teal: #0b8591;
+  --f-blue: #276fd0; --f-indigo: #4f54c2; --f-violet: #7f43cc; --f-pink: #c6338c;
+  --rainbow: linear-gradient(90deg, var(--c-red), var(--c-orange), var(--c-yellow), var(--c-green), var(--c-teal), var(--c-blue), var(--c-indigo), var(--c-violet), var(--c-pink));
+  --sunset: linear-gradient(100deg, var(--f-violet), var(--f-pink) 55%, var(--f-orange));
+  --o-surface: hsl(var(--card));
+  --o-ink: hsl(var(--foreground));
+  --o-line: hsl(var(--border));
+}
+.dark {
+  --c-red: #ff6b70; --c-orange: #ff9150; --c-yellow: #f2c443; --c-green: #4cc38a; --c-teal: #3cc7d1;
+  --c-blue: #5aa9ff; --c-indigo: #8f93ff; --c-violet: #bd8bff; --c-pink: #f27bc4;
+}
+
+/* ---------- Rainbow ---------- */
+.rb .o-brand { background: var(--rainbow); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.rb .o-topbar { position: relative; border-bottom-color: transparent; }
+.rb .o-topbar::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; background: var(--rainbow); }
+.rb .o-capture { background: linear-gradient(100deg, var(--c-indigo), var(--c-violet) 55%, var(--c-pink)); }
+.rb [data-nav="home"] { --h: var(--c-orange); --hf: var(--f-orange); }
+.rb [data-nav="actions"] { --h: var(--c-pink); --hf: var(--f-pink); }
+.rb [data-nav="people"] { --h: var(--c-green); --hf: var(--f-green); }
+.rb [data-nav="meetings"] { --h: var(--c-blue); --hf: var(--f-blue); }
+.rb [data-nav="weeklyReport"] { --h: var(--c-violet); --hf: var(--f-violet); }
+.rb .o-nav svg, .rb .o-tab svg { color: var(--h); }
+.rb .o-nav[aria-current="page"] { background: color-mix(in srgb, var(--h) 15%, transparent); color: color-mix(in srgb, var(--h) 78%, var(--o-ink)); }
+.rb .o-tab[aria-current="page"] { color: color-mix(in srgb, var(--h) 85%, var(--o-ink)); }
+.rb .o-stat { background: color-mix(in srgb, var(--h) 11%, var(--o-surface)); border-color: color-mix(in srgb, var(--h) 32%, var(--o-line)); }
+.rb .o-stat b { color: color-mix(in srgb, var(--h) 88%, var(--o-ink)); }
+.rb .o-stat span { color: color-mix(in srgb, var(--h) 45%, hsl(var(--muted-foreground))); }
+.rb .o-panel[data-hued] { border-color: color-mix(in srgb, var(--h) 34%, var(--o-line)); }
+.rb .o-panel[data-hued] > .o-panel-h { background: color-mix(in srgb, var(--h) 11%, var(--o-surface)); border-radius: 0.75rem 0.75rem 0 0; border-bottom: 1px solid color-mix(in srgb, var(--h) 22%, var(--o-line)); }
+.rb .o-panel[data-hued] > .o-panel-h, .rb .o-panel[data-hued] > .o-panel-h * { color: color-mix(in srgb, var(--h) 82%, var(--o-ink)); }
+.rb .o-panel[data-hued] > .o-panel-h + * > .o-row:first-child, .rb .o-panel[data-hued] > .o-panel-h + .o-row { border-top-color: transparent; }
+.rb .o-avatar { background: color-mix(in srgb, var(--h, hsl(var(--primary))) 20%, var(--o-surface)); color: color-mix(in srgb, var(--h, hsl(var(--primary))) 85%, var(--o-ink)); }
+.rb .o-tag[data-hued] { background: color-mix(in srgb, var(--h) 15%, var(--o-surface)); color: color-mix(in srgb, var(--h) 85%, var(--o-ink)); }
+.rb .o-datebox { background: color-mix(in srgb, var(--h, hsl(var(--primary))) 14%, var(--o-surface)); border-radius: 10px; padding: 7px 0 6px; }
+.rb .o-datebox b { color: color-mix(in srgb, var(--h, hsl(var(--primary))) 85%, var(--o-ink)); }
+.rb .o-pchip { border-color: color-mix(in srgb, var(--h, hsl(var(--primary))) 40%, var(--o-line)); }
+.rb .o-tick[data-done] { background: var(--c-green); border-color: var(--c-green); }
+.rb .o-banner { position: relative; overflow: hidden; background: var(--o-surface); border: 1px solid var(--o-line); }
+.rb .o-banner::before { content: ""; position: absolute; inset: 0; background: var(--rainbow); opacity: .13; pointer-events: none; }
+.rb .o-banner > * { position: relative; }
+.rb .o-ai { color: var(--c-pink); }
+
+/* ---------- Wild (on top of Rainbow) ---------- */
+.wild .o-app {
+  background:
+    radial-gradient(55% 45% at 0% 0%, color-mix(in srgb, var(--c-pink) 22%, transparent), transparent 70%),
+    radial-gradient(50% 45% at 100% 0%, color-mix(in srgb, var(--c-orange) 20%, transparent), transparent 70%),
+    radial-gradient(55% 50% at 100% 100%, color-mix(in srgb, var(--c-teal) 20%, transparent), transparent 70%),
+    radial-gradient(50% 50% at 0% 100%, color-mix(in srgb, var(--c-violet) 22%, transparent), transparent 70%),
+    hsl(var(--paper));
+}
+.wild .o-side { background: linear-gradient(180deg, var(--f-violet), var(--f-pink) 48%, var(--f-orange)); border-right-color: transparent; color: #fff; }
+.wild .o-side .o-brand { background: none; color: #fff; -webkit-background-clip: border-box; background-clip: border-box; }
+.wild .o-side .o-side-text { color: rgba(255, 255, 255, .85); }
+.wild .o-side .o-nav { color: rgba(255, 255, 255, .92); }
+.wild .o-side .o-nav svg { color: #fff; }
+.wild .o-side .o-nav:hover { background: rgba(255, 255, 255, .16); color: #fff; }
+.wild .o-side .o-nav[aria-current="page"] { background: #fff; color: var(--hf); box-shadow: 0 6px 16px -8px rgba(0, 0, 0, .45); }
+.wild .o-side .o-nav[aria-current="page"] svg { color: var(--hf); }
+.wild .o-side .o-count { background: #fff; color: var(--f-red); padding: 1px 7px; border-radius: 999px; }
+.wild .o-side .o-nav[aria-current="page"] .o-count { background: var(--f-red); color: #fff; }
+.wild .o-side .o-sep { background: rgba(255, 255, 255, .35); }
+.wild .o-side .o-look { background: rgba(255, 255, 255, .2); }
+.wild .o-side .o-look button { color: #fff; }
+.wild .o-side .o-look button[aria-pressed="true"] { background: #fff; color: var(--f-pink); }
+.wild .o-topbar { background: color-mix(in srgb, var(--o-surface) 72%, transparent); }
+.wild .o-topbar::after { height: 4px; }
+.wild .o-search { border: 2px solid transparent; background: linear-gradient(var(--o-surface), var(--o-surface)) padding-box, var(--rainbow) border-box; }
+.wild .o-tabs { background: linear-gradient(90deg, var(--f-orange), var(--f-pink) 40%, var(--f-violet) 70%, var(--f-blue)); border-top-color: transparent; }
+.wild .o-tab, .wild .o-tab svg { color: rgba(255, 255, 255, .88); }
+.wild .o-tab[aria-current="page"] { color: #fff; }
+.wild .o-tab[aria-current="page"] svg { background: #fff; color: var(--hf); border-radius: 10px; padding: 3px; box-sizing: content-box; }
+.wild .o-h1 { background: linear-gradient(90deg, var(--c-violet), var(--c-pink) 50%, var(--c-orange)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.wild .o-eyebrow { color: var(--c-pink); }
+.wild .o-stat { background: linear-gradient(135deg, var(--hf), color-mix(in srgb, var(--hf) 62%, var(--f-pink))); border-color: transparent; box-shadow: 0 10px 22px -12px var(--hf); }
+.wild .o-stat b, .wild .o-stat span { color: var(--hi, #fff); }
+.wild .o-panel { border: 2px solid transparent; background: linear-gradient(var(--o-surface), var(--o-surface)) padding-box, var(--rainbow) border-box; box-shadow: 0 12px 30px -20px var(--f-violet); }
+.wild .o-panel[data-hued] { border-color: transparent; background: color-mix(in srgb, var(--h) 8%, var(--o-surface)); box-shadow: 0 12px 30px -18px var(--hf); }
+.wild .o-panel[data-hued] > .o-panel-h { background: linear-gradient(100deg, var(--hf), color-mix(in srgb, var(--hf) 68%, var(--f-pink))); border-bottom-color: transparent; }
+.wild .o-panel[data-hued] > .o-panel-h, .wild .o-panel[data-hued] > .o-panel-h * { color: var(--hi, #fff); }
+.wild .o-panel[data-hued] .o-row { border-top-color: color-mix(in srgb, var(--h) 20%, var(--o-line)); }
+.wild .o-panel[data-hued] .o-row:hover { background: color-mix(in srgb, var(--h) 16%, var(--o-surface)); }
+.wild .o-panel[data-hued] .o-panel-f { color: color-mix(in srgb, var(--h) 85%, var(--o-ink)); border-top-color: color-mix(in srgb, var(--h) 22%, var(--o-line)); }
+.wild .o-panel[data-hued] .o-panel-f:hover { background: color-mix(in srgb, var(--h) 16%, var(--o-surface)); }
+.wild .o-avatar { background: var(--hf, var(--f-indigo)); color: var(--hi, #fff); }
+.wild .o-tag[data-hued] { background: var(--hf); color: var(--hi, #fff); }
+.wild .o-datebox { background: var(--hf, var(--f-indigo)); }
+.wild .o-datebox b, .wild .o-datebox span { color: var(--hi, #fff); }
+.wild .o-pchip { background: color-mix(in srgb, var(--h, hsl(var(--primary))) 16%, var(--o-surface)); border-color: var(--hf, hsl(var(--primary))); }
+.wild .o-tick:not([data-done]) { border-color: color-mix(in srgb, var(--h, var(--c-violet)) 65%, hsl(var(--muted-foreground))); }
+.wild .o-banner { background: var(--sunset); color: #fff; border-color: transparent; box-shadow: 0 12px 26px -16px var(--f-pink); }
+.wild .o-banner::before { display: none; }
+.wild .o-banner svg { color: #fff; }
+.wild .o-banner [data-variant="default"] { background: #fff; color: var(--f-pink); }
+.wild [data-variant="default"], .wild .o-capture { background: var(--sunset); box-shadow: 0 8px 18px -10px var(--f-pink); }
+.wild [data-variant="secondary"] { background: linear-gradient(100deg, color-mix(in srgb, var(--c-violet) 16%, var(--o-surface)), color-mix(in srgb, var(--c-pink) 16%, var(--o-surface))); color: color-mix(in srgb, var(--c-violet) 82%, var(--o-ink)); border-color: color-mix(in srgb, var(--c-violet) 25%, var(--o-line)); }
+.wild .o-seg { background: color-mix(in srgb, var(--c-violet) 14%, var(--o-surface)); }
+.wild .o-seg button[aria-pressed="true"] { background: linear-gradient(100deg, var(--f-blue), var(--f-violet)); color: #fff; }
+.wild .o-chip { border-color: color-mix(in srgb, var(--c-pink) 35%, var(--o-line)); }
+.wild .o-chip[aria-pressed="true"] { background: linear-gradient(100deg, var(--f-violet), var(--f-pink)); border-color: transparent; color: #fff; }
+.wild .o-field { border: 2px solid transparent; background: linear-gradient(var(--o-surface), var(--o-surface)) padding-box, linear-gradient(100deg, var(--c-blue), var(--c-violet), var(--c-pink)) border-box; }
+.wild .o-prep { background: color-mix(in srgb, var(--c-blue) 14%, var(--o-surface)); }
+.wild .o-mini { border-color: color-mix(in srgb, var(--h, var(--c-violet)) 45%, var(--o-line)); color: color-mix(in srgb, var(--h, var(--c-violet)) 85%, var(--o-ink)); }
+.wild .o-dhead { background: var(--sunset); }
+.wild .o-dhead, .wild .o-dhead button { color: #fff; }
+.wild .o-dhead .o-dirpill { background: #fff; color: var(--f-violet); }
+/* due chips on a coloured header keep their red/amber text on white so "overdue" stays legible */
+.wild .o-dhead .o-due { background: #fff; }
+.wild .o-modal { border: 2px solid transparent; background: linear-gradient(var(--o-surface), var(--o-surface)) padding-box, var(--rainbow) border-box; }
+.wild .o-palg { color: var(--c-pink); }
+.wild .o-group:not([data-hot]) { color: var(--c-violet); }
+
+/* the look switch itself */
+.o-look button[aria-pressed="true"][data-look="rainbow"] { background: var(--rainbow); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
+.o-look button[aria-pressed="true"][data-look="wild"] { background: var(--sunset); color: #fff; }

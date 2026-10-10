@@ -46,14 +46,15 @@ export function ActionRow({
       tabIndex={0}
       onClick={() => openAction({ meetingId: meeting.id, commitmentId: c.id })}
       onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget) openAction({ meetingId: meeting.id, commitmentId: c.id }); }}
-      className="flex cursor-pointer items-start gap-3 border-t border-border px-4 py-2.5 last:rounded-b-xl hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      className="o-row flex cursor-pointer items-start gap-3 border-t border-border px-4 py-2.5 last:rounded-b-xl hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
     >
       <button
         onClick={toggle}
         aria-label={done ? "Reopen" : "Mark done"}
         disabled={busy}
+        data-done={done ? "" : undefined}
         className={cn(
-          "mt-px grid h-5 w-5 shrink-0 place-items-center rounded-full border-[1.6px]",
+          "o-tick mt-px grid h-5 w-5 shrink-0 place-items-center rounded-full border-[1.6px]",
           done ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/50 text-transparent hover:border-primary hover:text-primary"
         )}
       >

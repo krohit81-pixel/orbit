@@ -101,7 +101,7 @@ export function CommandPalette() {
   const sources = (answer?.sources ?? []).map((s) => meetings.find((m) => m.id === s.meetingId)).filter((m): m is NonNullable<typeof m> => !!m);
   let idx = -1;
   const rowCls = (i: number) => `flex w-full items-center gap-2.5 px-4 py-2 text-left hover:bg-secondary ${i === sel ? "bg-secondary" : ""}`;
-  const groupCls = "px-4 pb-1 pt-2.5 text-[11.5px] font-bold uppercase tracking-[0.06em] text-muted-foreground/70";
+  const groupCls = "o-palg px-4 pb-1 pt-2.5 text-[11.5px] font-bold uppercase tracking-[0.06em] text-muted-foreground/70";
 
   return (
     <Modal onClose={close} label="Search and ask">

@@ -27,7 +27,7 @@ export function UpcomingRow({ u, manage }: { u: UpcomingMeeting; manage?: boolea
   const when = n === 0 ? "Today" : n === 1 ? "Tomorrow" : new Date(u.date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric" });
 
   return (
-    <div className="border-t border-border px-4 py-3">
+    <div className="o-row border-t border-border px-4 py-3">
       <div className="flex items-start gap-3">
         <div className="w-16 shrink-0 pt-px text-[13px] font-semibold tabular-nums">
           {fmtTime12h(u.startTime) ?? "—"}
@@ -63,7 +63,7 @@ export function UpcomingRow({ u, manage }: { u: UpcomingMeeting; manage?: boolea
       </div>
 
       {prepOpen && (
-        <div className="mt-2.5 rounded-[10px] bg-secondary px-3 py-2.5 text-[13px] sm:ml-[76px]">
+        <div className="o-prep mt-2.5 rounded-[10px] bg-secondary px-3 py-2.5 text-[13px] sm:ml-[76px]">
           <div className="font-semibold">Before you go in</div>
           <ul className="mt-1.5 flex list-disc flex-col gap-1 pl-[18px]">
             {openItems.map((c) => (

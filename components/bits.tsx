@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { ChevronRight, Quote, X } from "lucide-react";
 import { cn, dueChip } from "@/lib/utils";
+import { hueStyle, personHue, type HueKey } from "@/lib/hues";
 
 // A small "in progress" ring — use this anywhere an async action (network/DB call) is
 // underway, so it's always visually obvious that Orbit is working on something.
@@ -17,7 +18,7 @@ export function Spinner({ className }: { className?: string }) {
 
 export function Eyebrow({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("text-[11.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70", className)}>
+    <div className={cn("o-eyebrow text-[11.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70", className)}>
       {children}
     </div>
   );
@@ -51,7 +52,7 @@ export function PageHead({ eyebrow, title, right }: { eyebrow?: React.ReactNode;
     <div className="mb-[18px] flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
         {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
-        <h1 className="mt-0.5 text-balance text-[26px] font-bold leading-tight tracking-[-0.015em]">{title}</h1>
+        <h1 className="o-h1 mt-0.5 text-balance text-[26px] font-bold leading-tight tracking-[-0.015em]">{title}</h1>
       </div>
       {right && <div className="flex flex-wrap gap-2">{right}</div>}
     </div>
@@ -60,7 +61,7 @@ export function PageHead({ eyebrow, title, right }: { eyebrow?: React.ReactNode;
 
 // A titled panel: the one container style in 2.0. Rows inside draw their own top divider.
 export function Panel({
-  title, count, right, children, footer, className, id,
+  title, count, right, children, footer, className, id, hue,
 }: {
   title?: React.ReactNode;
   count?: number | null;
@@ -69,11 +70,12 @@ export function Panel({
   footer?: { label: string; onClick: () => void };
   className?: string;
   id?: string;
+  hue?: HueKey; // section colour in the Rainbow / Wild looks (v2.2); ignored by Calm
 }) {
   return (
-    <section id={id} className={cn("min-w-0 rounded-xl border border-border bg-card", className)}>
+    <section id={id} data-hued={hue ? "" : undefined} style={hueStyle(hue)} className={cn("o-panel min-w-0 rounded-xl border border-border bg-card", className)}>
       {(title || right) && (
-        <div className="flex items-center gap-2 px-4 pb-2.5 pt-3">
+        <div className="o-panel-h flex items-center gap-2 px-4 pb-2.5 pt-3">
           <span className="flex items-center gap-1.5 text-[14px] font-semibold">{title}</span>
           {count !== undefined && count !== null && (
             <span className="text-[12px] font-bold tabular-nums text-muted-foreground/70">{count}</span>
@@ -85,7 +87,7 @@ export function Panel({
       {footer && (
         <button
           onClick={footer.onClick}
-          className="block w-full rounded-b-xl border-t border-border px-4 py-2.5 text-left text-[13px] font-semibold text-accent-foreground hover:bg-secondary"
+          className="o-panel-f block w-full rounded-b-xl border-t border-border px-4 py-2.5 text-left text-[13px] font-semibold text-accent-foreground hover:bg-secondary"
         >
           {footer.label}
         </button>
@@ -107,7 +109,7 @@ export function DueChip({ dueDate, due, done, className }: { dueDate?: string | 
       title={label}
       className={cn(
         // max-w + truncate is a backstop: the label is already kept short by dueChip()
-        "max-w-[9rem] shrink-0 truncate whitespace-nowrap rounded-full px-2 py-0.5 text-[12px] font-semibold tabular-nums",
+        "o-due max-w-[9rem] shrink-0 truncate whitespace-nowrap rounded-full px-2 py-0.5 text-[12px] font-semibold tabular-nums",
         tone === "red" && "bg-warm/10 text-warm",
         tone === "amber" && "bg-caution/10 text-caution",
         tone === "plain" && "bg-secondary text-muted-foreground",
@@ -119,11 +121,13 @@ export function DueChip({ dueDate, due, done, className }: { dueDate?: string | 
   );
 }
 
-export function Tag({ children, tone = "accent", className }: { children: React.ReactNode; tone?: "accent" | "red" | "green" | "plain"; className?: string }) {
+export function Tag({ children, tone = "accent", className, hue }: { children: React.ReactNode; tone?: "accent" | "red" | "green" | "plain"; className?: string; hue?: HueKey }) {
   return (
     <span
+      data-hued={hue ? "" : undefined}
+      style={hueStyle(hue)}
       className={cn(
-        "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-[7px] py-px text-[11.5px] font-semibold",
+        "o-tag inline-flex items-center gap-1 whitespace-nowrap rounded-full px-[7px] py-px text-[11.5px] font-semibold",
         tone === "accent" && "bg-accent text-accent-foreground",
         tone === "red" && "bg-warm/10 text-warm",
         tone === "green" && "bg-success/10 text-success",
@@ -142,7 +146,7 @@ export function MiniButton({ className, ...props }: React.ButtonHTMLAttributes<H
     <button
       {...props}
       className={cn(
-        "whitespace-nowrap rounded-md border border-border bg-card px-2 py-[3px] text-[12px] font-semibold text-accent-foreground hover:border-primary disabled:opacity-50",
+        "o-mini whitespace-nowrap rounded-md border border-border bg-card px-2 py-[3px] text-[12px] font-semibold text-accent-foreground hover:border-primary disabled:opacity-50",
         className
       )}
     />
@@ -156,8 +160,9 @@ export function Avatar({ name, size = "md" }: { name: string; size?: "xs" | "md"
   return (
     <span
       aria-hidden="true"
+      style={hueStyle(personHue(name))}
       className={cn(
-        "grid shrink-0 place-items-center rounded-full bg-accent font-bold tracking-[0.02em] text-accent-foreground",
+        "o-avatar grid shrink-0 place-items-center rounded-full bg-accent font-bold tracking-[0.02em] text-accent-foreground",
         size === "xs" && "h-[22px] w-[22px] text-[9.5px]",
         size === "md" && "h-[34px] w-[34px] text-[12.5px]",
         size === "lg" && "h-[52px] w-[52px] text-[17px]"
@@ -198,7 +203,7 @@ export function HealthDots({ stars }: { stars: number | null }) {
 // Segmented control (Past / Upcoming, All / You owe / Owed to you).
 export function Seg<T extends string>({ value, options, onChange, label }: { value: T; options: [T, string][]; onChange: (v: T) => void; label: string }) {
   return (
-    <div className="inline-flex rounded-[9px] bg-secondary p-[3px]" role="group" aria-label={label}>
+    <div className="o-seg inline-flex rounded-[9px] bg-secondary p-[3px]" role="group" aria-label={label}>
       {options.map(([v, l]) => (
         <button
           key={v}
@@ -222,7 +227,7 @@ export function FilterChip({ on, onClick, children }: { on: boolean; onClick: ()
       aria-pressed={on}
       onClick={onClick}
       className={cn(
-        "whitespace-nowrap rounded-full border px-[11px] py-[5px] text-[12.5px] font-semibold",
+        "o-chip whitespace-nowrap rounded-full border px-[11px] py-[5px] text-[12.5px] font-semibold",
         on ? "border-foreground bg-foreground text-background" : "border-border bg-card text-muted-foreground"
       )}
     >
@@ -260,7 +265,7 @@ export function Modal({ onClose, children, label }: { onClose: () => void; child
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        className="fixed left-1/2 top-[10vh] z-50 max-h-[80vh] w-[min(560px,calc(100%-32px))] -translate-x-1/2 overflow-auto rounded-[14px] border border-border bg-card shadow-[0_8px_28px_-8px_rgba(40,40,110,0.35)]"
+        className="o-modal fixed left-1/2 top-[10vh] z-50 max-h-[80vh] w-[min(560px,calc(100%-32px))] -translate-x-1/2 overflow-auto rounded-[14px] border border-border bg-card shadow-[0_8px_28px_-8px_rgba(40,40,110,0.35)]"
       >
         {children}
       </div>

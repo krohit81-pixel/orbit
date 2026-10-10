@@ -9,6 +9,7 @@ import { WatchRow } from "@/components/WatchRow";
 import { UpcomingRow } from "@/components/UpcomingRow";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
+import { hueStyle } from "@/lib/hues";
 import {
   actionDir, awaitingReply, briefDigest, cn, daysFromToday, dueSoon, fmtStamp, isOverdueAction, openCommitmentsInvolvingMe,
   sortByUrgency, todayISO, todaysBriefData,
@@ -92,7 +93,7 @@ export function HomeScreen() {
 
   const headline = `${overdue.length ? `${overdue.length} overdue` : "Nothing overdue"}${todayMeetings.length ? `, ${todayMeetings.length} meeting${todayMeetings.length > 1 ? "s" : ""} today` : ""}`;
   const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
-  const stat = "flex flex-col gap-0.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left hover:border-muted-foreground/50";
+  const stat = "o-stat flex flex-col gap-0.5 rounded-xl border border-border bg-card px-3.5 py-3 text-left hover:border-muted-foreground/50";
 
   return (
     <div>
@@ -110,26 +111,26 @@ export function HomeScreen() {
       />
 
       <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        <button className={stat} onClick={() => nav({ screen: "actions", when: "overdue" })}>
+        <button className={stat} style={hueStyle("red")} onClick={() => nav({ screen: "actions", when: "overdue" })}>
           <b className={cn("text-[24px] font-bold leading-tight tabular-nums", overdue.length > 0 && "text-warm")}>{overdue.length}</b>
           <span className="text-[12.5px] text-muted-foreground">Overdue</span>
         </button>
-        <button className={stat} onClick={() => nav({ screen: "actions", when: "week" })}>
+        <button className={stat} style={hueStyle("orange")} onClick={() => nav({ screen: "actions", when: "week" })}>
           <b className="text-[24px] font-bold leading-tight tabular-nums">{week.length}</b>
           <span className="text-[12.5px] text-muted-foreground">Due in 7 days</span>
         </button>
-        <button className={stat} onClick={() => nav({ screen: "actions", when: "awaiting" })}>
+        <button className={stat} style={hueStyle("blue")} onClick={() => nav({ screen: "actions", when: "awaiting" })}>
           <b className="text-[24px] font-bold leading-tight tabular-nums">{awaiting.length}</b>
           <span className="text-[12.5px] text-muted-foreground">Awaiting reply</span>
         </button>
-        <button className={stat} onClick={() => document.getElementById("watch-panel")?.scrollIntoView({ behavior: "smooth", block: "center" })}>
+        <button className={stat} style={hueStyle("violet")} onClick={() => document.getElementById("watch-panel")?.scrollIntoView({ behavior: "smooth", block: "center" })}>
           <b className="text-[24px] font-bold leading-tight tabular-nums">{watch.length}</b>
           <span className="text-[12.5px] text-muted-foreground">On watch</span>
         </button>
       </div>
 
       {pendingMeetingReviews.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-accent px-4 py-3">
+        <div className="o-banner mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-accent px-4 py-3">
           <ClipboardCheck className="h-[18px] w-[18px] shrink-0 text-accent-foreground" />
           <div className="min-w-0 flex-1 text-[13.5px]">
             <b className="font-semibold">{pendingMeetingReviews.length} meeting{pendingMeetingReviews.length === 1 ? "" : "s"} from your calendar</b>{" "}
@@ -142,6 +143,7 @@ export function HomeScreen() {
       {(brief || briefErr) && (
         <Panel
           className="mb-4"
+          hue="pink"
           title={<span className="flex items-center gap-1.5 text-accent-foreground"><Sparkles className="h-3.5 w-3.5" /> Brief</span>}
           right={
             <span className="flex items-center gap-2">
@@ -159,6 +161,7 @@ export function HomeScreen() {
       <div className="flex flex-col gap-4">
         <div className="grid items-start gap-4 lg:grid-cols-2">
           <Panel
+            hue="orange"
             title={<><ArrowUpRight className="h-3.5 w-3.5" /> You owe</>}
             count={youOwe.length}
             footer={{ label: `All ${allOut} you owe`, onClick: () => nav({ screen: "actions", dir: "out" }) }}
@@ -166,6 +169,7 @@ export function HomeScreen() {
             {youOwe.length ? youOwe.slice(0, 6).map((c) => <ActionRow key={c.id} c={c} meeting={c.meeting} directional />) : <PanelEmpty>Nothing due this week.</PanelEmpty>}
           </Panel>
           <Panel
+            hue="green"
             title={<><ArrowDownLeft className="h-3.5 w-3.5" /> Owed to you</>}
             count={owed.length}
             footer={{ label: `All ${allIn} owed to you`, onClick: () => nav({ screen: "actions", dir: "in" }) }}
@@ -174,10 +178,10 @@ export function HomeScreen() {
           </Panel>
         </div>
         <div className="grid items-start gap-4 lg:grid-cols-2">
-          <Panel title="Next meetings" footer={{ label: "Full schedule", onClick: () => nav({ screen: "meetings", tab: "upcoming" }) }}>
+          <Panel hue="blue" title="Next meetings" footer={{ label: "Full schedule", onClick: () => nav({ screen: "meetings", tab: "upcoming" }) }}>
             {next.length ? next.map((u) => <UpcomingRow key={u.id} u={u} />) : <PanelEmpty>Nothing scheduled. Import a calendar photo from Capture.</PanelEmpty>}
           </Panel>
-          <Panel id="watch-panel" title={<><Eye className="h-3.5 w-3.5" /> Watch</>} count={watch.length}>
+          <Panel id="watch-panel" hue="violet" title={<><Eye className="h-3.5 w-3.5" /> Watch</>} count={watch.length}>
             {watch.length ? watch.slice(0, 4).map(({ concern, meeting, recurring }) => <WatchRow key={concern.id} concern={concern} meeting={meeting} recurring={recurring} />)
               : <PanelEmpty>Nothing on watch.</PanelEmpty>}
             {watch.length > 4 && <PanelEmpty>{watch.length - 4} more open. They stay on the meetings and people they came from; resolve the ones that no longer apply.</PanelEmpty>}

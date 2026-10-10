@@ -85,7 +85,7 @@ export function ReviewScreen() {
         </Panel>
 
         {r.commitmentSuggestions.length > 0 && (
-          <Panel title={<><Sparkles className="h-3.5 w-3.5 text-accent-foreground" /> Updates to existing actions</>} count={r.commitmentSuggestions.length}>
+          <Panel hue="pink" title={<><Sparkles className="h-3.5 w-3.5 text-accent-foreground" /> Updates to existing actions</>} count={r.commitmentSuggestions.length}>
             {r.commitmentSuggestions.map((s) => (
               <div key={s._id} className={item(s.include)}>
                 <Tick on={s.include} onClick={() => toggle("commitmentSuggestions", s._id)} />
@@ -102,7 +102,7 @@ export function ReviewScreen() {
           </Panel>
         )}
 
-        <Panel title="New actions" count={r.commitments.length}>
+        <Panel hue="indigo" title="New actions" count={r.commitments.length}>
           {r.commitments.length === 0 && <PanelEmpty>None found.</PanelEmpty>}
           {r.commitments.map((x) => (
             <div key={x._id} className={item(x.include)}>
@@ -125,7 +125,7 @@ export function ReviewScreen() {
         </Panel>
 
         {r.concerns.length > 0 && (
-          <Panel title={<><Eye className="h-3.5 w-3.5" /> Watch</>} count={r.concerns.length}>
+          <Panel hue="violet" title={<><Eye className="h-3.5 w-3.5" /> Watch</>} count={r.concerns.length}>
             {r.concerns.map((x) => (
               <div key={x._id} className={item(x.include)}>
                 <Tick on={x.include} onClick={() => toggle("concerns", x._id)} />
@@ -140,7 +140,7 @@ export function ReviewScreen() {
         )}
 
         {r.expectations.length > 0 && (
-          <Panel title="What they expect" count={r.expectations.length}>
+          <Panel hue="teal" title="What they expect" count={r.expectations.length}>
             {r.expectations.map((x) => (
               <div key={x._id} className={item(x.include)}>
                 <Tick on={x.include} onClick={() => toggle("expectations", x._id)} />
@@ -154,7 +154,7 @@ export function ReviewScreen() {
         )}
 
         {r.decisions.length > 0 && (
-          <Panel title="Decisions" count={r.decisions.length}>
+          <Panel hue="blue" title="Decisions" count={r.decisions.length}>
             <ol className="flex list-decimal flex-col gap-1.5 pb-3.5 pl-[34px] pr-4">{r.decisions.map((d, i) => <li key={i}>{d}</li>)}</ol>
           </Panel>
         )}

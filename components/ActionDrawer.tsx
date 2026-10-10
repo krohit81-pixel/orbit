@@ -89,8 +89,8 @@ export function ActionDrawer() {
       >
         {open && c && meeting && (
           <>
-            <div className="flex items-center gap-2 px-4 pb-2.5 pt-3.5" ref={closeRef}>
-              <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[12px] font-semibold text-accent-foreground">
+            <div className="o-dhead flex items-center gap-2 px-4 pb-2.5 pt-3.5" ref={closeRef}>
+              <span className="o-dirpill inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[12px] font-semibold text-accent-foreground">
                 <DirIcon c={c} />{commitmentLabel(c, stakeholders)}
               </span>
               <DueChip dueDate={c.dueDate} due={c.due} done={!isOpen} />

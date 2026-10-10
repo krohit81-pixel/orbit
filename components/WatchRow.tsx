@@ -23,7 +23,7 @@ export function WatchRow({ concern: c, meeting, recurring, hidePerson }: { conce
   };
 
   return (
-    <div className="border-t border-border px-4 py-2.5">
+    <div className="o-row border-t border-border px-4 py-2.5">
       <div className={cn("font-medium leading-snug", resolved && "text-muted-foreground/70 line-through")}>{c.text}</div>
       <div className="mt-[3px] flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-muted-foreground">
         {!hidePerson && person && (

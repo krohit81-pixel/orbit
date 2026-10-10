@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { PageHead, Panel, PanelEmpty, Spinner } from "@/components/bits";
 import { ActionRow } from "@/components/ActionRow";
 import { WatchRow } from "@/components/WatchRow";
+import type { HueKey } from "@/lib/hues";
 import { useOrbit } from "@/components/OrbitStore";
 import {
   commitmentLabel, fmtFull, fmtWeekRange, startOfWeek, addDaysISO, todayISO, sanitizeForPdf, weeklyReportData,
@@ -130,8 +131,8 @@ export function WeeklyReportScreen() {
     }
   };
 
-  const summaryPanel = (title: string, items: string[] | undefined) => (
-    <Panel title={<><Sparkles className="h-3.5 w-3.5 text-accent-foreground" /> {title}</>}>
+  const summaryPanel = (title: string, items: string[] | undefined, hue: HueKey) => (
+    <Panel hue={hue} title={<><Sparkles className="h-3.5 w-3.5 text-accent-foreground" /> {title}</>}>
       {items === undefined ? <PanelEmpty>Tap “Write summary” to draft this section.</PanelEmpty>
         : items.length === 0 ? <PanelEmpty>Nothing to report.</PanelEmpty>
         : <ul className="flex list-disc flex-col gap-1.5 pb-3.5 pl-[34px] pr-4">{items.map((t, i) => <li key={i}>{t}</li>)}</ul>}
@@ -161,15 +162,15 @@ export function WeeklyReportScreen() {
       </div>
       {err && <div className="mb-3 text-[13px] text-warm">{err}</div>}
       <div className="flex flex-col gap-4">
-        {summaryPanel("Achieved", report?.achieved)}
-        <Panel title="Pending" count={data.pending.length}>
+        {summaryPanel("Achieved", report?.achieved, "green")}
+        <Panel hue="orange" title="Pending" count={data.pending.length}>
           {data.pending.length ? data.pending.map((c) => <ActionRow key={c.id} c={c} meeting={c.meeting} />) : <PanelEmpty>Nothing overdue or due in the next 7 days.</PanelEmpty>}
         </Panel>
-        <Panel title={<><Eye className="h-3.5 w-3.5" /> Raised this week</>} count={data.openConcerns.length}>
+        <Panel hue="violet" title={<><Eye className="h-3.5 w-3.5" /> Raised this week</>} count={data.openConcerns.length}>
           {data.openConcerns.length ? data.openConcerns.map(({ concern, meeting, recurring }) => <WatchRow key={concern.id} concern={concern} meeting={meeting} recurring={recurring} />)
             : <PanelEmpty>No new concerns this week.</PanelEmpty>}
         </Panel>
-        {summaryPanel("Focus next week", report?.focusForFuture)}
+        {summaryPanel("Focus next week", report?.focusForFuture, "blue")}
       </div>
     </div>
   );

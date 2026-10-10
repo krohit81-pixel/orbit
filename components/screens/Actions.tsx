@@ -52,7 +52,7 @@ export function ActionsScreen({ dir: initialDir, when: initialWhen }: { dir?: Ac
             <FilterChip key={v} on={when === v} onClick={() => setWhen(v)}>{l}</FilterChip>
           ))}
         </div>
-        <label className="flex min-w-[180px] flex-1 items-center gap-2 rounded-[9px] border border-border bg-card px-3 py-[7px] focus-within:border-primary">
+        <label className="o-field flex min-w-[180px] flex-1 items-center gap-2 rounded-[9px] border border-border bg-card px-3 py-[7px] focus-within:border-primary">
           <Search className="h-3.5 w-3.5 text-muted-foreground" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter by text, person or meeting" aria-label="Filter actions" className="w-full min-w-0 bg-transparent outline-none" />
         </label>
@@ -63,7 +63,7 @@ export function ActionsScreen({ dir: initialDir, when: initialWhen }: { dir?: Ac
         {shown.map(([label, items, hot], gi) => (
           <div key={label || "list"}>
             {label ? (
-              <div className={`flex items-center gap-2 px-4 pb-2 ${gi === 0 ? "pt-3" : "pt-3.5"} text-[12px] font-bold uppercase tracking-[0.06em] ${hot ? "text-warm" : "text-muted-foreground/70"}`}>
+              <div data-hot={hot ? "" : undefined} className={`o-group flex items-center gap-2 px-4 pb-2 ${gi === 0 ? "pt-3" : "pt-3.5"} text-[12px] font-bold uppercase tracking-[0.06em] ${hot ? "text-warm" : "text-muted-foreground/70"}`}>
                 {label} <span>{items.length}</span>
               </div>
             ) : <div className="h-1" />}

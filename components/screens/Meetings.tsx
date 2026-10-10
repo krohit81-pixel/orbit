@@ -7,6 +7,7 @@ import { Faces, PageHead, Panel, PanelEmpty, Seg } from "@/components/bits";
 import { UpcomingRow } from "@/components/UpcomingRow";
 import { useOrbit } from "@/components/OrbitStore";
 import { useFlow } from "@/components/flow";
+import { hueStyle, personHue } from "@/lib/hues";
 import { matchesQuery, stakeholderById, todayISO } from "@/lib/utils";
 
 // Recall a discussion (Past) or get ready for one (Upcoming, with prep notes and calendar import).
@@ -33,7 +34,7 @@ export function MeetingsScreen({ initialTab }: { initialTab?: "past" | "upcoming
       {tab === "past" ? (
         <>
           <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
-            <label className="flex min-w-[180px] flex-1 items-center gap-2 rounded-[9px] border border-border bg-card px-3 py-[7px] focus-within:border-primary">
+            <label className="o-field flex min-w-[180px] flex-1 items-center gap-2 rounded-[9px] border border-border bg-card px-3 py-[7px] focus-within:border-primary">
               <Search className="h-3.5 w-3.5 text-muted-foreground" />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a discussion by person, topic or title" aria-label="Find a meeting" className="w-full min-w-0 bg-transparent outline-none" />
             </label>
@@ -49,9 +50,9 @@ export function MeetingsScreen({ initialTab }: { initialTab?: "past" | "upcoming
                   <button
                     key={m.id}
                     onClick={() => go({ screen: "meeting", id: m.id })}
-                    className="grid w-full grid-cols-[46px_minmax(0,1fr)_auto] items-start gap-3.5 border-t border-border px-4 py-3 text-left first:rounded-t-xl last:rounded-b-xl hover:bg-secondary"
+                    className="o-row grid w-full grid-cols-[46px_minmax(0,1fr)_auto] items-start gap-3.5 border-t border-border px-4 py-3 text-left first:rounded-t-xl last:rounded-b-xl hover:bg-secondary"
                   >
-                    <span className="pt-px text-center leading-tight">
+                    <span className="o-datebox pt-px text-center leading-tight" style={people[0] ? hueStyle(personHue(people[0])) : undefined}>
                       <b className="block text-[19px] font-bold tabular-nums">{d.getDate()}</b>
                       <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">{d.toLocaleDateString("en-GB", { month: "short" })}</span>
                     </span>
